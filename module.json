@@ -2,9 +2,11 @@
   "id": "swffg-astronav",
   "title": "SWFFG Astronav — Astrogation & Atlas galactique",
   "description": "Calculateur d'astrogation pour Star Wars FFG : itinéraire par hyperroutes canon entre ~6800 mondes, difficulté du test d'Astrogation (pool de dés, améliorations, boost/setback), durée et coût du voyage, jet posté dans le chat. Inclut un compendium « Planètes — Astronav » de 6849 systèmes rangés par région (image, secteur, coordonnées, terrain, climat, gravité, population, affiliations, description). Astrogation calculator + a 6849-planet gazetteer compendium for the Star Wars FFG system.",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "authors": [
-    { "name": "wanoo" }
+    {
+      "name": "wanoo"
+    }
   ],
   "compatibility": {
     "minimum": "12",
@@ -12,7 +14,11 @@
   },
   "relationships": {
     "systems": [
-      { "id": "starwarsffg", "type": "system", "compatibility": {} }
+      {
+        "id": "starwarsffg",
+        "type": "system",
+        "compatibility": {}
+      }
     ]
   },
   "esmodules": [
@@ -25,21 +31,34 @@
       "path": "packs/planetes",
       "type": "JournalEntry",
       "system": "starwarsffg",
-      "ownership": { "PLAYER": "OBSERVER", "ASSISTANT": "OWNER" }
+      "ownership": {
+        "PLAYER": "OBSERVER",
+        "ASSISTANT": "OWNER"
+      }
     }
   ],
   "packFolders": [
     {
       "name": "SWFFG Astronav",
       "sorting": "m",
-      "packs": ["planetes"]
+      "packs": [
+        "planetes"
+      ]
     }
   ],
   "languages": [
-    { "lang": "en", "name": "English", "path": "lang/en.json" },
-    { "lang": "fr", "name": "Français", "path": "lang/fr.json" }
+    {
+      "lang": "en",
+      "name": "English",
+      "path": "lang/en.json"
+    },
+    {
+      "lang": "fr",
+      "name": "Français",
+      "path": "lang/fr.json"
+    }
   ],
   "url": "https://github.com/wanoo/swffg-astronav",
-  "manifest": "https://github.com/wanoo/swffg-astronav/releases/latest/download/module.json",
-  "download": "https://github.com/wanoo/swffg-astronav/releases/latest/download/swffg-astronav.zip"
+  "manifest": "https://sw-wanoo-holocron.cleverapps.io/modules/swffg-astronav/module.json",
+  "download": "https://sw-wanoo-holocron.cleverapps.io/modules/swffg-astronav/swffg-astronav.zip"
 }
