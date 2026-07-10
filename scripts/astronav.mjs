@@ -8,8 +8,8 @@
  * Aucune dépendance au contenu d'un monde : ce module est réutilisable tel quel.
  */
 
-const MODULE = "swffg-astronav";
-const asset = (p) => `modules/${MODULE}/${p}`;
+export const MODULE = "swffg-astronav";
+export const asset = (p) => `modules/${MODULE}/${p}`;
 
 /* ------------------------------------------------------------------ moteur -- */
 const U = 99.7, DPC = { major: .4, minor: .7, off: 1.2 }, OFF = 900, HP = 4;
@@ -103,8 +103,9 @@ function astroCheck(o, dst, route, sh) {
   diff = Math.max(1, Math.min(5, diff));
   return { diff, boost, setback, upgrades: up, parts, calc: up ? "4 heures (Redoutable+)" : CT[diff] };
 }
-const tripCost = (route, hyper) => ({ days: Math.ceil(route.days), fuel: Math.ceil(route.cases.total + route.cases.off * .5), usure: Math.max(1, Math.ceil(route.days * .4 + route.cases.off * .6)) });
-function fmtDays(d) {
+export { computeRoute, astroCheck };
+export const tripCost = (route, hyper) => ({ days: Math.ceil(route.days), fuel: Math.ceil(route.cases.total + route.cases.off * .5), usure: Math.max(1, Math.ceil(route.days * .4 + route.cases.off * .6)) });
+export function fmtDays(d) {
   if (d < .75) return "< 1 jour";
   if (d < 10) { const n = Math.max(1, Math.round(d)); return "≈ " + n + " jour" + (n > 1 ? "s" : ""); }
   const w = Math.max(1, Math.round(d / 7)); return "≈ " + w + " semaine" + (w > 1 ? "s" : "");
@@ -112,8 +113,8 @@ function fmtDays(d) {
 
 /* ------------------------------------------------------- données + settings -- */
 let BY_NAME = null, GRAPH = null, LIST = null;
-async function ensureData() {
-  if (GRAPH) return;
+export async function ensureData() {
+  if (GRAPH) return getData();
   const [pj, lanes] = await Promise.all([
     fetch(asset("data/planets.json")).then((r) => r.json()),
     fetch(asset("data/lanes.json")).then((r) => r.json()),
@@ -122,21 +123,15 @@ async function ensureData() {
   BY_NAME = {}; for (const p of arr) BY_NAME[p.name] = p;
   LIST = arr.filter((p) => p.xy).map((p) => p.name).sort();
   GRAPH = buildGraph(BY_NAME, lanes);
+  return getData();
 }
-const hostileSet = () => new Set(String(game.settings.get(MODULE, "hostile") || "").split(",").map((s) => s.trim()).filter(Boolean));
+export const getData = () => ({ byName: BY_NAME, graph: GRAPH, list: LIST });
+export const hostileSet = () => new Set(String(game.settings.get(MODULE, "hostile") || "").split(",").map((s) => s.trim()).filter(Boolean));
 
-/** Wear source: the real party ship if swffg-command-deck is active, else the local setting. */
-async function currentWear() {
-  const deck = game.modules.get("swffg-command-deck");
-  if (deck?.active && deck.api?.ship) {
-    try { const s = await deck.api.ship(); if (s) return Number(s.usure) || 0; } catch { /* repli setting */ }
-  }
-  return Number(game.settings.get(MODULE, "usure")) || 0;
-}
-
-const esc = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+export const esc = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
 const DIE = { di: ["◆", "#8850c8"], ch: ["◆", "#d6595a"], bo: ["■", "#8fd4ff"], se: ["■", "#666"] };
-const dice = (pool) => ["di", "ch", "bo", "se"].map((k) => `<b style="color:${DIE[k][1]}">` + DIE[k][0].repeat(pool[k] || 0) + "</b>").join("");
+export const dice = (pool) => ["di", "ch", "bo", "se"].map((k) => `<b style="color:${DIE[k][1]}">` + DIE[k][0].repeat(pool[k] || 0) + "</b>").join("");
+export { DN };
 
 /* ------------------------------------------------------------------ l'app --- */
 export class AstronavApp extends foundry.applications.api.ApplicationV2 {
@@ -191,21 +186,19 @@ export class AstronavApp extends foundry.applications.api.ApplicationV2 {
     root.querySelectorAll("input").forEach((el) => el.addEventListener("keydown", (e) => { if (e.key === "Enter") this._compute(root); }));
   }
 
-  async _compute(root) {
+  _compute(root) {
     const from = root.querySelector("#an-from").value.trim(), to = root.querySelector("#an-to").value.trim();
     const hyper = Number(root.querySelector("#an-hyper").value) || 1, avoid = root.querySelector("#an-avoid").checked;
     const res = root.querySelector("#an-res"); res.classList.remove("an-hint");
     const o = BY_NAME[from], dst = BY_NAME[to];
     if (!o || !dst) { res.innerHTML = `<b style="color:#e5544b">Monde inconnu : ${esc(!o ? from : to)}</b>`; return; }
     if (!o.xy || !dst.xy || o.name === dst.name) { res.innerHTML = `<b style="color:#e5544b">Itinéraire impossible (coordonnées manquantes ou mondes identiques).</b>`; return; }
-    const sh = { usure: await currentWear() };
+    const sh = { usure: Number(game.settings.get(MODULE, "usure")) || 0 };
     const route = computeRoute(GRAPH, o, dst, hyper, { avoid, hostile: hostileSet() });
     if (!route) { res.innerHTML = `<b style="color:#e5544b">Aucun itinéraire trouvé.</b>`; return; }
     const chk = astroCheck(o, dst, route, sh), cost = tripCost(route, hyper), chal = Math.min(chk.upgrades, chk.diff);
     const pool = { difficulty: chk.diff - chal, ...(chal ? { challenge: chal } : {}), ...(chk.boost ? { boost: chk.boost } : {}), ...(chk.setback ? { setback: chk.setback } : {}) };
     this._last = { o, dst, route, chk, cost, pool, hyper };
-    // Pont vers d'autres modules (ex. swffg-command-deck : « Appliquer au vaisseau »)
-    Hooks.callAll("swffgAstronav.route", { from: o.name, to: dst.name, cost, route, check: chk, hyper });
     res.innerHTML = `
       <div class="an-cells">
         <div class="an-cell"><div class="k">Itinéraire</div><div class="v">${route.cases.total.toFixed(1)} cases<small>${Math.round(((route.cases.major + route.cases.minor) / (route.cases.total || 1)) * 100)}% sur routes${route.hostile ? ` · ⚠️ ${route.hostile} hostile(s)` : avoid ? " · 🕶️ 0 hostile" : ""}</small></div></div>

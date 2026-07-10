@@ -8,6 +8,9 @@ Deux outils en un :
   **difficulté du test d'Astrogation** (pool de dés FFG avec améliorations, boost et setback),
   la **durée** et le **coût** du voyage, puis poste le jet dans le chat (obstacle intégré au
   pool sur le système `starwarsffg`).
+- **Navi-Computer (tableau de bord)** — le cockpit du groupe : allégeance, statut du vaisseau
+  (vivres, carburant, usure en barres), position, équipage, alignement des PNJ, dépêches HoloNet,
+  et l'astrogation intégrée avec application du voyage (déduit vivres/carburant, ajoute l'usure).
 - **Compendium « Planètes — Astronav »** — un atlas de **6 849 mondes** rangés par région
   (Noyau, Colonies, Bordure Extérieure, Régions Inconnues…). Chaque fiche : image, secteur,
   coordonnées de grille, terrain, climat, gravité, diamètre, population, affiliations,
@@ -21,12 +24,18 @@ Dans Foundry : **Add-on Modules → Install Module**, puis colle l'URL du manife
 https://github.com/wanoo/swffg-astronav/releases/latest/download/module.json
 ```
 
-Active le module dans ton monde, puis ouvre l'Astronav via le **bouton en forme de route**
-dans la barre de contrôles de scène (groupe jetons), ou par l'API :
+Active le module. Deux boutons apparaissent dans la barre de contrôles de scène (groupe jetons) :
+la **route** ouvre le calculateur d'astrogation, l'**antenne** ouvre le Navi-Computer. Via l'API :
 
 ```js
-game.modules.get("swffg-astronav").api.open();
+const api = game.modules.get("swffg-astronav").api;
+api.open();            // calculateur d'astrogation
+api.openDashboard();   // tableau de bord Navi-Computer
+api.install();         // (MJ) crée les journaux de campagne manquants
 ```
+
+Le tableau de bord lit l'état de campagne dans des journaux du monde (noms configurables dans
+les paramètres du module). `api.install()` — ou le lien affiché quand ils manquent — les crée.
 
 ## Paramètres du module
 

@@ -22,7 +22,8 @@
     ]
   },
   "esmodules": [
-    "scripts/astronav.mjs"
+    "scripts/astronav.mjs",
+    "scripts/navicomputer.mjs"
   ],
   "packs": [
     {
