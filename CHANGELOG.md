@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.1.1
+
+- Bump de version pour que Foundry détecte la mise à jour (la 1.1.0 servie ne contenait pas
+  encore le Navi-Computer). Aucun changement fonctionnel par rapport à la 1.1.0 finale.
+
 ## 1.1.0
 
 - **Navi-Computer (tableau de bord)** : cockpit du groupe (allégeance, vaisseau en barres,
