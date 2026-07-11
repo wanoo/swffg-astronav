@@ -25,8 +25,8 @@ EXCLUDE_NAME = {"build.py", "build_pack.py", "build_pack.mjs", ".DS_Store",
 def included(rel: pathlib.Path) -> bool:
     if rel.name in EXCLUDE_NAME: return False
     if any(part in EXCLUDE_TOP for part in rel.parts): return False
-    # packs/_source exclu, packs/planetes gardé
-    if len(rel.parts) >= 2 and rel.parts[0] == "packs" and rel.parts[1] == "_source": return False
+    # sources de packs exclues (régénérables), packs compilés gardés
+    if len(rel.parts) >= 2 and rel.parts[0] == "packs" and rel.parts[1] in ("_source", "_macros_src"): return False
     return True
 
 if "--zip" in sys.argv:

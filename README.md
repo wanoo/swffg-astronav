@@ -37,6 +37,20 @@ api.install();         // (MJ) crée les journaux de campagne manquants
 Le tableau de bord lit l'état de campagne dans des journaux du monde (noms configurables dans
 les paramètres du module). `api.install()` — ou le lien affiché quand ils manquent — les crée.
 
+### Envoyer un monde dans l'Astronav
+
+Le compendium **Macros — Astronav** contient la macro **🧭 Astronav — ce monde**. Ouvre une
+fiche planète du compendium, lance la macro (glisse-la sur ta barre) : elle propose de définir
+ce monde comme **départ** 🛫, **arrivée** 🛬, ou simplement de le **voir** 👁️ dans l'Astronav.
+Sans fiche ouverte, elle demande le nom du monde. En API :
+
+```js
+const api = game.modules.get("swffg-astronav").api;
+api.setLeg("Tatooine", "to");   // définir comme arrivée
+api.showWorld("Coruscant");     // ouvrir l'Astronav sur ce monde
+api.chooser("Ilum");            // menu Voir / Départ / Arrivée
+```
+
 ## Paramètres du module
 
 | Paramètre | Effet |

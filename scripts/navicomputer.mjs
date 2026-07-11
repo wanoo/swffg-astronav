@@ -140,6 +140,16 @@ export class NaviComputerApp extends foundry.applications.api.ApplicationV2 {
   };
   async _renderHTML() { await ensureData(); return buildHTML(); }
   _replaceHTML(html, content) { content.innerHTML = html; this._wire(content); }
+
+  /** Renseigne origine/destination depuis un preset (macros « départ / arrivée »). */
+  applyLeg(leg) {
+    const root = this.element; if (!root) return;
+    const f = root.querySelector("#nv-from"), t = root.querySelector("#nv-to");
+    if (leg.from && f) f.value = leg.from;
+    if (leg.to && t) t.value = leg.to;
+    if (f?.value?.trim() && t?.value?.trim()) this._compute(root);
+    this.bringToFront?.();
+  }
   _wire(root) {
     const app = this;
     root.querySelectorAll("[data-act]").forEach((el) => el.addEventListener("click", async () => {

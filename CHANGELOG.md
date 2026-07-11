@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.2.0
+
+- **« Ce monde sur l'Astronav »** : depuis une fiche planète, l'envoyer dans le calculateur
+  comme **départ** ou **arrivée**, ou juste la **voir** (région/secteur/terrain affichés).
+- Compendium **Macros — Astronav** avec la macro `🧭 Astronav — ce monde` (détecte la fiche
+  ouverte, sinon demande le monde, puis propose Voir / Départ / Arrivée).
+- API : `api.setLeg(nom, "from"|"to")`, `api.showWorld(nom)`, `api.chooser(nom?)`, `api.data()`.
+- Le calculateur affiche une ligne d'info sur le monde d'origine.
+
 ## 1.1.1
 
 - Bump de version pour que Foundry détecte la mise à jour (la 1.1.0 servie ne contenait pas

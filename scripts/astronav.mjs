@@ -168,13 +168,14 @@ export class AstronavApp extends foundry.applications.api.ApplicationV2 {
     <div class="an-root">
       <datalist id="an-pl">${dlist}</datalist>
       <div class="an-form">
-        <div class="an-f"><label>Origine</label><input id="an-from" list="an-pl" value="Coruscant"/></div>
-        <div class="an-f"><label>Destination</label><input id="an-to" list="an-pl" placeholder="Tatooine"/></div>
+        <div class="an-f"><label>Origine</label><input id="an-from" list="an-pl" value="${esc(LEG.from || "Coruscant")}"/></div>
+        <div class="an-f"><label>Destination</label><input id="an-to" list="an-pl" placeholder="Tatooine" value="${esc(LEG.to || "")}"/></div>
         <div class="an-f" style="flex:0 0 96px"><label>Hyperdrive</label><select id="an-hyper">
           ${[0.5, 1, 2, 3, 4].map((h) => `<option value="${h}" ${h === 1 ? "selected" : ""}>×${h}</option>`).join("")}</select></div>
         <label style="display:flex;gap:4px;align-items:center;font-size:11px"><input type="checkbox" id="an-avoid"/> 🕶️ discret</label>
         <button type="button" class="an-btn" data-act="compute">Calculer</button>
       </div>
+      <div id="an-info" style="font-size:11px;opacity:.75;margin:-2px 0 8px;min-height:14px"></div>
       <div id="an-res" class="an-hint">Choisis deux mondes puis « Calculer ». Usure vaisseau : ${usure}% (réglable dans les paramètres du module).</div>
     </div>`;
   }
@@ -184,6 +185,27 @@ export class AstronavApp extends foundry.applications.api.ApplicationV2 {
   _wire(root) {
     root.querySelector('[data-act="compute"]').addEventListener("click", () => this._compute(root));
     root.querySelectorAll("input").forEach((el) => el.addEventListener("keydown", (e) => { if (e.key === "Enter") this._compute(root); }));
+    const from = root.querySelector("#an-from");
+    from.addEventListener("input", () => this._updateInfo(root));
+    this._updateInfo(root);
+  }
+
+  _updateInfo(root) {
+    const { byName } = getData();
+    const p = byName[(root.querySelector("#an-from")?.value || "").trim()];
+    const info = root.querySelector("#an-info");
+    if (info) info.innerHTML = p ? `📍 <b>${esc(p.name)}</b> — ${[p.region, p.sector, p.terrain].filter(Boolean).map(esc).join(" · ") || "—"}` : "";
+  }
+
+  /** Renseigne origine/destination depuis un preset (macros « départ / arrivée »). */
+  applyLeg(leg) {
+    const root = this.element; if (!root) return;
+    const f = root.querySelector("#an-from"), t = root.querySelector("#an-to");
+    if (leg.from && f) f.value = leg.from;
+    if (leg.to && t) t.value = leg.to;
+    this._updateInfo(root);
+    if (f?.value?.trim() && t?.value?.trim()) this._compute(root);
+    this.bringToFront?.();
   }
 
   _compute(root) {
@@ -226,6 +248,66 @@ export class AstronavApp extends foundry.applications.api.ApplicationV2 {
   }
 }
 
+/* ------------------------------------------- presets « départ / arrivée » --- */
+// Monde partagé entre le compendium/les macros et les fenêtres ouvertes.
+export const LEG = { from: null, to: null };
+
+function legApps() {
+  return Object.values(ui.windows ?? {}).filter(
+    (w) => w instanceof AstronavApp || w?.constructor?.name === "NaviComputerApp");
+}
+function dispatchLeg() {
+  const apps = legApps();
+  for (const a of apps) a.applyLeg?.(LEG);
+  return apps.length;
+}
+
+/** Place un monde comme origine ("from") ou destination ("to") dans l'Astronav. */
+export async function setLeg(name, role) {
+  await ensureData();
+  if (!BY_NAME[name]) return ui.notifications.warn(`Astronav : monde inconnu « ${name} ».`);
+  LEG[role] = name;
+  if (!dispatchLeg()) new AstronavApp().render(true);
+  ui.notifications.info(`Astronav — ${role === "to" ? "arrivée" : "départ"} : ${name}.`);
+}
+/** Ouvre l'Astronav sur ce monde (comme origine) et affiche ses infos. */
+export async function showWorld(name) {
+  await ensureData();
+  if (!BY_NAME[name]) return ui.notifications.warn(`Astronav : monde inconnu « ${name} ».`);
+  LEG.from = name;
+  if (!dispatchLeg()) new AstronavApp().render(true);
+}
+/** Petit choix « Voir / Départ / Arrivée » pour un monde (nom résolu, sinon demandé). */
+export async function chooser(name) {
+  await ensureData();
+  const DialogV2 = foundry.applications.api.DialogV2;
+  let target = name && BY_NAME[name] ? name : null;
+  if (!target) {
+    const dl = LIST.map((n) => `<option value="${esc(n)}">`).join("");
+    const picked = await DialogV2.prompt({
+      window: { title: "Astronav — choisir un monde" },
+      content: `<datalist id="an-pick">${dl}</datalist>
+        <p><input name="w" list="an-pick" value="${esc(name ?? "")}" placeholder="Nom du monde" style="width:100%"/></p>`,
+      ok: { label: "Continuer", callback: (ev, btn) => btn.form.elements.w.value.trim() },
+    }).catch(() => null);
+    if (!picked) return;
+    target = picked;
+  }
+  if (!BY_NAME[target]) return ui.notifications.warn(`Astronav : monde inconnu « ${target} ».`);
+  const p = BY_NAME[target];
+  const info = [p.region, p.sector, p.terrain].filter(Boolean).map(esc).join(" · ") || "—";
+  await DialogV2.wait({
+    window: { title: `Astronav — ${target}` },
+    content: `<p style="margin:.2em 0"><strong>${esc(target)}</strong></p><p style="opacity:.7;font-size:12px">${info}</p>`,
+    buttons: [
+      { action: "from", label: "🛫 Départ", callback: () => setLeg(target, "from") },
+      { action: "to", label: "🛬 Arrivée", callback: () => setLeg(target, "to") },
+      { action: "show", label: "👁️ Voir sur l'Astronav", callback: () => showWorld(target) },
+    ],
+    rejectClose: false,
+  }).catch(() => null);
+}
+
 /* --------------------------------------------------------------- amorçage --- */
 Hooks.once("init", () => {
   game.settings.register(MODULE, "hostile", {
@@ -236,7 +318,13 @@ Hooks.once("init", () => {
     name: "Usure du vaisseau (%)", hint: "Au-delà de 50 %, +1 à la difficulté ; au-delà de 80 %, +2.",
     scope: "world", config: true, type: Number, default: 0, range: { min: 0, max: 100, step: 5 },
   });
-  game.modules.get(MODULE).api = { open: () => new AstronavApp().render(true), AstronavApp };
+  const m = game.modules.get(MODULE);
+  m.api = {
+    ...(m.api || {}),
+    open: () => new AstronavApp().render(true),
+    setLeg, showWorld, chooser, data: async () => { await ensureData(); return getData(); },
+    AstronavApp,
+  };
 });
 
 // Bouton dans les contrôles de scène (barre de gauche), groupe « jetons ».

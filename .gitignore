@@ -6,3 +6,4 @@ package-lock.json
 
 # sources régénérables du pack (via build_pack.py depuis data/planets.json)
 packs/_source/
+packs/_macros_src/
