@@ -15,9 +15,11 @@ const command = [
   'const api = game.modules.get("swffg-astronav")?.api;',
   'if (!api?.chooser) { ui.notifications.error("Active le module « SWFFG Astronav »."); }',
   'else {',
-  '  // dernière fiche de journal ouverte = la planète regardée',
-  '  const jw = Object.values(ui.windows).reverse().find((w) => w?.document?.documentName === "JournalEntry");',
-  '  api.chooser(jw?.document?.name);',
+  '  // fiche planète ouverte = JournalEntry, ou JournalEntryPage/entrée exposée par Monk\'s Enhanced Journal',
+  '  const isJ = (d) => d?.documentName === "JournalEntry" || d?.documentName === "JournalEntryPage";',
+  '  const jw = Object.values(ui.windows).reverse().find((w) => isJ(w?.document) || isJ(w?.object));',
+  '  const doc = jw?.document ?? jw?.object;',
+  '  api.chooser(doc ? (doc.parent?.name ?? doc.name) : undefined);',
   '}',
 ].join("\n");
 

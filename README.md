@@ -12,9 +12,15 @@ Deux outils en un :
   (vivres, carburant, usure en barres), position, équipage, alignement des PNJ, dépêches HoloNet,
   et l'astrogation intégrée avec application du voyage (déduit vivres/carburant, ajoute l'usure).
 - **Compendium « Planètes — Astronav »** — un atlas de **6 849 mondes** rangés par région
-  (Noyau, Colonies, Bordure Extérieure, Régions Inconnues…). Chaque fiche : image, secteur,
-  coordonnées de grille, terrain, climat, gravité, diamètre, population, affiliations,
-  description, lieux notables.
+  (Noyau, Colonies, Bordure Extérieure, Régions Inconnues…), présentés en fiches
+  **Monk's Enhanced Journal « Place »** : couverture image, localisation, et **favoris**.
+  Chaque fiche : image (embarquée dans le module), secteur, coordonnées, terrain, climat,
+  gravité, diamètre, population, affiliations, description, lieux notables.
+
+## Dépendance
+
+Ce module **requiert [Monk's Enhanced Journal](https://foundryvtt.com/packages/monks-enhanced-journal)**
+(les fiches planètes sont des sheets « Place »). Foundry propose de l'installer automatiquement.
 
 ## Installation
 

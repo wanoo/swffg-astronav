@@ -35,17 +35,19 @@ def strip_wiki(s):
     return s.strip()
 
 def content(p):
-    """Fiche HTML complète d'une planète."""
-    name = esc(p.get("name", "?"))
-    img = p.get("img")
+    """Corps HTML d'une fiche MEJ « Place ».
+
+    Région, secteur et coordonnées vivent dans les champs MEJ (placetype / location /
+    attributes.districts) — ils ne figurent donc PAS dans le tableau. L'image est portée
+    par la couverture MEJ (page.src), pas par un bandeau inline.
+    Ordre (calé sur la fiche de référence) : description → lieux notables → campagne →
+    tableau réduit → légendes.
+    """
+    facts = p.get("facts") or {}
+    f = p.get("f") or {}
     rows = []
     def row(k, v):
         if v: rows.append(f"<tr><th style=\"text-align:left;white-space:nowrap;padding:2px 10px 2px 0;color:#7fdfff\">{esc(k)}</th><td>{esc(v)}</td></tr>")
-    facts = p.get("facts") or {}
-    f = p.get("f") or {}
-    row("Région", p.get("region"))
-    row("Secteur", p.get("sector"))
-    row("Coordonnées", p.get("coord"))
     row("Terrain", p.get("terrain") or facts.get("terrain"))
     row("Climat", facts.get("climat") or (", ".join(f["clim"]) if isinstance(f.get("clim"), list) else None))
     row("Gravité", facts.get("gravite"))
@@ -60,19 +62,17 @@ def content(p):
     row("Cartographie", charted)
 
     html = []
-    if img:
-        html.append(f'<figure style="margin:0 0 10px"><img src="{esc(img)}" alt="{name}" '
-                    f'style="max-width:100%;border-radius:8px"/></figure>')
-    html.append(f'<table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:10px">'
-                + "".join(rows) + "</table>")
     if p.get("desc"):
         html.append(f"<p>{esc(p['desc'])}</p>")
     if isinstance(p.get("points"), list) and p["points"]:
-        html.append("<h3>Lieux notables</h3><ul>"
-                    + "".join(f"<li>{esc(x)}</li>" for x in p["points"]) + "</ul>")
+        html.append("<h3>Lieux notables</h3><ol>"
+                    + "".join(f"<li>{esc(x)}</li>" for x in p["points"]) + "</ol>")
     if p.get("campaign"):
         html.append(f'<blockquote style="border-left:3px solid #d9b45b;padding-left:10px;'
                     f'color:#d9b45b"><strong>Campagne —</strong> {esc(p["campaign"])}</blockquote>')
+    if rows:
+        html.append(f'<table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:10px">'
+                    + "".join(rows) + "</table>")
     if p.get("legends"):
         leg = strip_wiki(p["legends"])
         if leg:
@@ -109,23 +109,41 @@ def main():
             "flags": {}, "_stats": {}
         }, open(os.path.join(SRC, f"folder_{i}.json"), "w"), ensure_ascii=False)
 
-    # une entrée par planète
+    # une entrée par planète — fiche Monk's Enhanced Journal « Place »
     n = 0
     for p in sorted(planets, key=lambda x: x.get("name", "")):
         reg = (p.get("region") or "").strip()
+        img = p.get("img")                     # chemin local (modules/swffg-astronav/img/...)
         jid, pid = fid(), fid()
+        mej_page = {
+            "type": "place",
+            "placetype": reg,                  # région -> « type de lieu » MEJ
+            "location": p.get("sector") or "", # secteur -> localisation MEJ
+            "attributes": {"age": "", "size": "", "government": "", "inhabitants": "",
+                           "faction": "", "districts": p.get("coord") or ""},  # coord -> districts
+            "relationships": {}, "items": {},
+            "style": {"img": "", "color": "transparent", "sizing": "repeat"},
+        }
+        mej_entry = {"pagetype": "place", **({"img": img} if img else {})}
         doc = {
             "_id": jid, "_key": f"!journal!{jid}", "name": p.get("name", "?"),
             "folder": folder_id.get(reg),
             "pages": [{
                 "_id": pid, "_key": f"!journal.pages!{jid}.{pid}",
                 "name": p.get("name", "?"), "type": "text",
-                "title": {"show": False, "level": 1},
+                "title": {"show": True, "level": 1},
+                "src": img,                    # couverture MEJ (None si pas d'image)
+                "image": {}, "video": {"controls": True, "volume": 0.5},
+                "category": None, "system": {},
                 "text": {"format": 1, "content": content(p)},
-                "sort": 0, "ownership": {"default": -1}, "flags": {}, "_stats": {}
+                "sort": 0, "ownership": {"default": -1},
+                "flags": {"monks-enhanced-journal": mej_page}, "_stats": {}
             }],
-            "flags": {"swffg-astronav": {k: p.get(k) for k in
-                      ("region", "sector", "coord", "grid", "xy", "charted", "img") if p.get(k) is not None}},
+            "flags": {
+                "swffg-astronav": {k: p.get(k) for k in
+                    ("region", "sector", "coord", "grid", "xy", "charted", "img") if p.get(k) is not None},
+                "monks-enhanced-journal": mej_entry,
+            },
             "ownership": {"default": 0}, "sort": 0, "_stats": {}
         }
         json.dump(doc, open(os.path.join(SRC, f"journal_{jid}.json"), "w"), ensure_ascii=False)
