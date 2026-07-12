@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.5.1
+
+- **Overlay hyperroutes** sur la carte : deux bascules (Grandes routes / Routes mineures)
+  affichent le réseau canon (tracés colorés par grande route), la route calculée passant au-dessus.
+
 ## 1.5.0
 
 - **Carte galactique interactive** dans la fenêtre Astronav : fond de carte GFFA, pan/zoom
