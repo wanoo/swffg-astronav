@@ -1,11 +1,11 @@
 /**
- * SWFFG Astronav — calculateur d'astrogation (Star Wars FFG).
- * Fenêtre ApplicationV2 autonome : origine/destination parmi ~6800 mondes, calcul de
- * l'itinéraire par hyperroutes canon, difficulté du test d'Astrogation FFG (dés +
- * améliorations), durée et coût, et jet posté dans le chat.
+ * SWFFG Astronav — calculateur + carte d'astrogation (Star Wars FFG).
+ * Fenêtre ApplicationV2 : carte galactique interactive (canvas, pan/zoom, tracé de route
+ * A* coloré, marqueurs origine/destination/favoris), origine/destination parmi ~6800 mondes,
+ * difficulté du test d'Astrogation FFG (vrais glyphes de dés), durée, coût, jet posté au chat.
  *
- * Données embarquées dans le module (data/planets.json + data/lanes.json).
- * Aucune dépendance au contenu d'un monde : ce module est réutilisable tel quel.
+ * Données + image embarquées dans le module (data/planets.json, data/lanes.json, img/galaxy-map.jpg).
+ * Dépend de Monk's Enhanced Journal (favoris = marque-pages MEJ sur les fiches planètes).
  */
 
 export const MODULE = "swffg-astronav";
@@ -21,6 +21,12 @@ const CP = { 5: 0, 4: 0, 3: 1, 2: 2, 1: 2, 0: 3 };
 const CL = { 5: "spatioport A–B", 4: "spatioport standard (C)", 3: "services limités (D)",
              2: "terrain d'atterrissage (E)", 1: "terrain sommaire (E)", 0: "sans spatioport (X)" };
 const CT = { 1: "2 rounds", 2: "5 rounds", 3: "10 minutes", 4: "1 heure", 5: "4 heures" };
+
+// Carte : calibration coordonnées swgalaxymap -> pixels de l'image GFFA (5400²).
+const STAGE = 5400;
+const CAL = { cx: 2699.5, cy: 2490, k: 2.155, size: 5400 };
+const posOf = (p) => (p && p.xy) ? [CAL.cx + p.xy[0] * CAL.k, CAL.cy - p.xy[1] * CAL.k] : null;
+const SEG_STYLE = { major: ["#ffd76a", 3.4, []], minor: ["#c9a6ff", 3, []], off: ["#57c7ff", 2.6, [8, 6]] };
 
 function buildGraph(byName, lanes) {
   const idx = new Map(), nodes = [], adj = new Map();
@@ -77,13 +83,14 @@ function computeRoute(g, o, dst, hyper, opts) {
   }
   if (!isFinite(D[N + 1])) return null;
   const xyOf = (i) => i === N ? o.xy : i === N + 1 ? dst.xy : nodes[i].xy;
-  const cases = { major: 0, minor: 0, off: 0, total: 0 }, onPath = new Set();
+  const cases = { major: 0, minor: 0, off: 0, total: 0 }, onPath = new Set(), segs = [];
   for (let v = N + 1; P[v] >= 0 || P[v] === N; v = P[v]) {
     const u = P[v]; const du = Math.hypot(xyOf(u)[0] - xyOf(v)[0], xyOf(u)[1] - xyOf(v)[1]); const cls = PC[v] || "off";
+    segs.unshift({ a: xyOf(u), b: xyOf(v), cls, du });   // a/b = coordonnées galactiques brutes
     cases[cls] += du / U; cases.total += du / U; if (u < N) onPath.add(u); if (v < N) onPath.add(v); if (u === N) break;
   }
   let hc = 0; for (const i of onPath) if (hn[i]) hc++;
-  return { cases, days: D[N + 1] * hyper, hostile: hc, regions: Math.abs(rrank(o.region) - rrank(dst.region)), avoid: !!opts.avoid };
+  return { segs, cases, days: D[N + 1] * hyper, hostile: hc, regions: Math.abs(rrank(o.region) - rrank(dst.region)), avoid: !!opts.avoid };
 }
 
 function astroCheck(o, dst, route, sh) {
@@ -127,67 +134,148 @@ export async function ensureData() {
 }
 export const getData = () => ({ byName: BY_NAME, graph: GRAPH, list: LIST });
 export const hostileSet = () => new Set(String(game.settings.get(MODULE, "hostile") || "").split(",").map((s) => s.trim()).filter(Boolean));
+const S = (k) => game.settings.get(MODULE, k);
 
 export const esc = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
-const DIE = { di: ["◆", "#8850c8"], ch: ["◆", "#d6595a"], bo: ["■", "#8fd4ff"], se: ["■", "#666"] };
-export const dice = (pool) => ["di", "ch", "bo", "se"].map((k) => `<b style="color:${DIE[k][1]}">` + DIE[k][0].repeat(pool[k] || 0) + "</b>").join("");
+
+// Difficulté : vrais glyphes du système FFG (police EotESymbol, CSS globale `dietype`).
+// difficulty=d (violet), challenge=c (rouge), boost=b (bleu clair), setback=b (noir).
+const DIE = { di: ["difficulty", "d"], ch: ["challenge", "c"], bo: ["boost", "b"], se: ["setback", "b"] };
+export const dice = (pool) => ["di", "ch", "bo", "se"].map((k) => {
+  const n = pool[k] || 0; if (!n) return "";
+  const [cls, ch] = DIE[k];
+  return `<span class="dietype starwars ${cls}">${ch.repeat(n)}</span>`;
+}).join("");
 export { DN };
+
+/** Mondes mis en favori via l'étoile de Monk's Enhanced Journal (marque-pages par utilisateur). */
+export async function favoriteWorlds() {
+  const bm = game.user?.getFlag?.("monks-enhanced-journal", "bookmarks") || [];
+  const names = [];
+  for (const b of bm) {
+    let doc = null; try { doc = await fromUuid(b.entityId); } catch { /* uuid mort */ }
+    if (!doc) continue;
+    if (doc.pack === `${MODULE}.planetes` || doc.flags?.[MODULE]?.xy || doc.parent?.flags?.[MODULE]) {
+      const nm = doc.parent?.name ?? doc.name;
+      if (BY_NAME?.[nm]) names.push(nm);
+    }
+  }
+  return [...new Set(names)];
+}
 
 /* ------------------------------------------------------------------ l'app --- */
 export class AstronavApp extends foundry.applications.api.ApplicationV2 {
   static DEFAULT_OPTIONS = {
     id: "swffg-astronav-app",
     window: { title: "SWFFG.astronav.title", icon: "fa-solid fa-route", resizable: true },
-    position: { width: 720, height: 620 },
+    position: { width: 1180, height: 760 },
   };
 
   async _renderHTML() {
     await ensureData();
     const dlist = LIST.map((n) => `<option value="${esc(n)}">`).join("");
-    const usure = Number(game.settings.get(MODULE, "usure")) || 0;
     return `<style>
-      .an-root { padding: 12px; color: #d8ecf7; font-size: 13px; height: 100%; overflow: auto;
+      .an-root { color: #d8ecf7; font-size: 13px; height: 100%; box-sizing: border-box;
         background: radial-gradient(1200px 500px at 30% -10%, #10283a55, transparent), #0a121b; }
-      .an-form { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; margin-bottom: 8px; }
-      .an-f { display: flex; flex-direction: column; gap: 2px; flex: 1 1 160px; }
+      .an-cols { display: flex; gap: 10px; height: 100%; padding: 10px; box-sizing: border-box; }
+      .an-side { flex: 0 0 350px; display: flex; flex-direction: column; gap: 8px; overflow: auto; min-height: 0; }
+      .an-map { flex: 1; min-width: 0; }
+      .an-form { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; }
+      .an-f { display: flex; flex-direction: column; gap: 2px; flex: 1 1 130px; }
       .an-f label { font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: #7fdfff; }
       .an-root input, .an-root select { background: #0a1520; border: 1px solid #2b5b73; color: #d8ecf7; border-radius: 6px; padding: 5px 7px; }
+      .an-mode { display: flex; gap: 12px; font-size: 11px; }
+      .an-mode label { display: flex; gap: 4px; align-items: center; cursor: pointer; }
       .an-btn { background: transparent; border: 1px solid #d9b45b; color: #d9b45b; border-radius: 999px; padding: 5px 16px; cursor: pointer; font-weight: 700; }
       .an-btn:hover { background: #d9b45b; color: #06121c; }
       .an-btn.cy { border-color: #7fdfff; color: #7fdfff; }
       .an-btn.cy:hover { background: #7fdfff; color: #06121c; }
-      .an-cells { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 6px; margin: 8px 0; }
+      .an-cells { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 6px; margin: 4px 0; }
       .an-cell { border: 1px solid #2b5b73; border-radius: 8px; padding: 6px 8px; background: #0c1926aa; }
       .an-cell .k { font-size: 9px; text-transform: uppercase; letter-spacing: .07em; color: #7fdfff; }
       .an-cell .v { font-size: 15px; font-weight: 700; color: #eaf6ff; margin-top: 2px; }
       .an-cell .v small { display: block; font-size: 10px; font-weight: 400; opacity: .65; }
       .an-parts { font-size: 11px; opacity: .8; }
-      .an-acts { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+      .an-acts { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
       .an-hint { opacity: .5; font-size: 12px; }
+      .an-fav { display: flex; flex-wrap: wrap; gap: 4px; }
+      .an-fav .k { flex: 0 0 100%; font-size: 9px; text-transform: uppercase; letter-spacing: .07em; color: #7fdfff; }
+      .an-chip { background: #0c1926; border: 1px solid #6a5320; color: #d9b45b; border-radius: 999px; padding: 2px 9px; font-size: 11px; cursor: pointer; }
+      .an-chip:hover { background: #d9b45b; color: #06121c; }
+      .an-viewport { position: relative; width: 100%; height: 100%; overflow: hidden; border: 1px solid #2b5b73;
+        border-radius: 10px; background: #05070c; touch-action: none; cursor: grab; }
+      .an-viewport.grabbing { cursor: grabbing; }
+      .an-canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+      .an-zoom { position: absolute; right: 8px; bottom: 8px; display: flex; gap: 4px; }
+      .an-zoom button { width: 30px; height: 30px; border-radius: 7px; border: 1px solid #2b5b73; background: #0c1926cc; color: #d8ecf7; cursor: pointer; font-size: 15px; }
+      .an-zoom button:hover { background: #14324a; }
+      .an-legend { position: absolute; left: 8px; bottom: 8px; display: flex; gap: 10px; flex-wrap: wrap; font-size: 10px;
+        background: #05070ccc; border: 1px solid #2b5b73; border-radius: 7px; padding: 4px 8px; color: #b8d4e6; }
+      .an-legend b { font-weight: 700; }
+      .an-die { color: #9db8c8; }
     </style>
     <div class="an-root">
       <datalist id="an-pl">${dlist}</datalist>
-      <div class="an-form">
-        <div class="an-f"><label>Origine</label><input id="an-from" list="an-pl" value="${esc(LEG.from || "Coruscant")}"/></div>
-        <div class="an-f"><label>Destination</label><input id="an-to" list="an-pl" placeholder="Tatooine" value="${esc(LEG.to || "")}"/></div>
-        <div class="an-f" style="flex:0 0 96px"><label>Hyperdrive</label><select id="an-hyper">
-          ${[0.5, 1, 2, 3, 4].map((h) => `<option value="${h}" ${h === 1 ? "selected" : ""}>×${h}</option>`).join("")}</select></div>
-        <label style="display:flex;gap:4px;align-items:center;font-size:11px"><input type="checkbox" id="an-avoid"/> 🕶️ discret</label>
-        <button type="button" class="an-btn" data-act="compute">Calculer</button>
+      <div class="an-cols">
+        <div class="an-side">
+          <div class="an-form">
+            <div class="an-f"><label>Origine</label><input id="an-from" list="an-pl" value="${esc(LEG.from || "Coruscant")}"/></div>
+            <div class="an-f"><label>Destination</label><input id="an-to" list="an-pl" placeholder="Tatooine" value="${esc(LEG.to || "")}"/></div>
+            <div class="an-f" style="flex:0 0 84px"><label>Hyperdrive</label><select id="an-hyper">
+              ${[0.5, 1, 2, 3, 4].map((h) => `<option value="${h}" ${h === 1 ? "selected" : ""}>×${h}</option>`).join("")}</select></div>
+            <label style="display:flex;gap:4px;align-items:center;font-size:11px"><input type="checkbox" id="an-avoid"/> 🕶️ discret</label>
+            <button type="button" class="an-btn" data-act="compute">Calculer</button>
+          </div>
+          <div class="an-mode">
+            <span style="opacity:.6">Clic carte =</span>
+            <label><input type="radio" name="an-mode" value="from" checked> 🛫 départ</label>
+            <label><input type="radio" name="an-mode" value="to"> 🛬 arrivée</label>
+          </div>
+          <div id="an-info" style="font-size:11px;opacity:.75;min-height:14px"></div>
+          <div id="an-res" class="an-hint">Choisis deux mondes puis « Calculer », ou clique un marqueur sur la carte.</div>
+          <div id="an-fav" class="an-fav"></div>
+        </div>
+        <div class="an-map">
+          <div class="an-viewport" id="an-vp">
+            <canvas class="an-canvas" id="an-canvas"></canvas>
+            <div class="an-legend">
+              <span><b style="color:#6fbf8f">●</b> origine</span>
+              <span><b style="color:#57c7ff">●</b> destination</span>
+              <span><b style="color:#d9b45b">●</b> favori</span>
+              <span><b style="color:#ffd76a">▬</b> grande route</span>
+              <span><b style="color:#c9a6ff">▬</b> secondaire</span>
+              <span><b style="color:#57c7ff">┄</b> hors réseau</span>
+            </div>
+            <div class="an-zoom">
+              <button type="button" data-z="in" title="Zoom avant">+</button>
+              <button type="button" data-z="out" title="Zoom arrière">−</button>
+              <button type="button" data-z="route" title="Cadrer le trajet">🎯</button>
+              <button type="button" data-z="reset" title="Vue galaxie">⤢</button>
+            </div>
+          </div>
+        </div>
       </div>
-      <div id="an-info" style="font-size:11px;opacity:.75;margin:-2px 0 8px;min-height:14px"></div>
-      <div id="an-res" class="an-hint">Choisis deux mondes puis « Calculer ». Usure vaisseau : ${usure}% (réglable dans les paramètres du module).</div>
     </div>`;
   }
 
   _replaceHTML(html, content) { content.innerHTML = html; this._wire(content); }
 
+  _onRender(context, options) { this._initMap(this.element); this._loadFavorites(); }
+
+  async _close(options) {
+    this._map?.ro?.disconnect();
+    return super._close(options);
+  }
+
   _wire(root) {
     root.querySelector('[data-act="compute"]').addEventListener("click", () => this._compute(root));
-    root.querySelectorAll("input").forEach((el) => el.addEventListener("keydown", (e) => { if (e.key === "Enter") this._compute(root); }));
-    const from = root.querySelector("#an-from");
-    from.addEventListener("input", () => this._updateInfo(root));
+    root.querySelectorAll("#an-from, #an-to").forEach((el) => el.addEventListener("keydown", (e) => { if (e.key === "Enter") this._compute(root); }));
+    root.querySelector("#an-from").addEventListener("input", () => this._updateInfo(root));
     this._updateInfo(root);
+  }
+
+  _clickMode() {
+    return this.element?.querySelector('input[name="an-mode"]:checked')?.value === "to" ? "to" : "from";
   }
 
   _updateInfo(root) {
@@ -197,7 +285,209 @@ export class AstronavApp extends foundry.applications.api.ApplicationV2 {
     if (info) info.innerHTML = p ? `📍 <b>${esc(p.name)}</b> — ${[p.region, p.sector, p.terrain].filter(Boolean).map(esc).join(" · ") || "—"}` : "";
   }
 
-  /** Renseigne origine/destination depuis un preset (macros « départ / arrivée »). */
+  /* ---- favoris ---- */
+  async _loadFavorites() {
+    const names = await favoriteWorlds().catch(() => []);
+    if (!this._map) return;
+    this._map.favSet = new Set(names);
+    this._schedule();
+    const box = this.element?.querySelector("#an-fav");
+    if (box) box.innerHTML = names.length
+      ? `<span class="k">★ Favoris</span>` + names.map((n) => `<button type="button" class="an-chip" data-fav="${esc(n)}">${esc(n)}</button>`).join("")
+      : "";
+    box?.querySelectorAll("[data-fav]").forEach((b) => b.addEventListener("click", () => setLeg(b.dataset.fav, this._clickMode())));
+  }
+
+  /* ---- carte : cycle de vie ApplicationV2 ---- */
+  _initMap(root) {
+    const vp = root?.querySelector("#an-vp"), canvas = root?.querySelector("#an-canvas");
+    if (!vp || !canvas) return;
+    const prev = this._map || {};
+    prev.ro?.disconnect();
+    this._map = {
+      vp, canvas, ctx: canvas.getContext("2d"),
+      s: prev.s ?? 0.15, tx: prev.tx ?? 0, ty: prev.ty ?? 0, minS: prev.minS ?? 0.1, dpr: 1,
+      img: prev.img, o: prev.o, dst: prev.dst, route: prev.route, favSet: prev.favSet ?? new Set(),
+      raf: 0, ro: null,
+    };
+    if (vp.dataset.anBound !== "1") { vp.dataset.anBound = "1"; this._bindMap(vp, canvas); }
+    // image de fond : chargée une fois, gardée sur l'instance
+    if (!this._map.img) {
+      const img = new Image();
+      img.src = foundry.utils.getRoute(asset("img/galaxy-map.jpg"));
+      // succès → fond + cadrage ; échec (404/offline) → carte sans fond, route + marqueurs quand même.
+      img.decode().then(() => { this._map.img = img; this._fitGalaxy(); }).catch(() => { this._fitGalaxy(); });
+    }
+    const ro = new ResizeObserver(() => this._resize());
+    ro.observe(vp); this._map.ro = ro;
+    this._resize();
+  }
+
+  _bindMap(vp, canvas) {
+    const zoomAt = (cx, cy, f) => this._zoomAt(cx, cy, f);
+    vp.addEventListener("wheel", (e) => {
+      e.preventDefault(); const r = vp.getBoundingClientRect();
+      zoomAt(e.clientX - r.left, e.clientY - r.top, e.deltaY < 0 ? 1.18 : 1 / 1.18);
+    }, { passive: false });
+
+    let drag = null, moved = 0;
+    vp.addEventListener("pointerdown", (e) => {
+      if (e.target.closest(".an-zoom")) return;
+      drag = { x: e.clientX, y: e.clientY, tx: this._map.tx, ty: this._map.ty }; moved = 0;
+      vp.setPointerCapture(e.pointerId); vp.classList.add("grabbing");
+    });
+    vp.addEventListener("pointermove", (e) => {
+      if (!drag) return;
+      moved = Math.max(moved, Math.hypot(e.clientX - drag.x, e.clientY - drag.y));
+      this._map.tx = drag.tx + (e.clientX - drag.x); this._map.ty = drag.ty + (e.clientY - drag.y);
+      this._clamp(); this._schedule();
+    });
+    const end = (e) => {
+      if (drag && moved < 5) {           // clic (pas un glissé) : hit-test
+        const r = vp.getBoundingClientRect();
+        const name = this._hitTest(e.clientX - r.left, e.clientY - r.top);
+        if (name) setLeg(name, e.shiftKey ? (this._clickMode() === "to" ? "from" : "to") : this._clickMode());
+      }
+      drag = null; vp.classList.remove("grabbing");
+    };
+    vp.addEventListener("pointerup", end); vp.addEventListener("pointercancel", () => { drag = null; vp.classList.remove("grabbing"); });
+
+    vp.querySelector(".an-zoom").addEventListener("click", (e) => {
+      const z = e.target.dataset.z; if (!z) return;
+      const r = vp.getBoundingClientRect();
+      if (z === "in") this._zoomAt(r.width / 2, r.height / 2, 1.4);
+      else if (z === "out") this._zoomAt(r.width / 2, r.height / 2, 1 / 1.4);
+      else if (z === "reset") this._fitGalaxy();
+      else if (z === "route") this._fitRoute();
+    });
+
+    // pincement (2 doigts)
+    const pts = new Map(); let pd = 0;
+    vp.addEventListener("pointerdown", (e) => pts.set(e.pointerId, e));
+    vp.addEventListener("pointermove", (e) => {
+      if (!pts.has(e.pointerId)) return; pts.set(e.pointerId, e);
+      if (pts.size === 2) {
+        const [a, b] = [...pts.values()];
+        const d = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+        if (pd) { const r = vp.getBoundingClientRect(); this._zoomAt((a.clientX + b.clientX) / 2 - r.left, (a.clientY + b.clientY) / 2 - r.top, d / pd); }
+        pd = d; drag = null;
+      }
+    });
+    const clearP = (e) => { pts.delete(e.pointerId); if (pts.size < 2) pd = 0; };
+    vp.addEventListener("pointerup", clearP); vp.addEventListener("pointercancel", clearP);
+  }
+
+  _resize() {
+    const m = this._map; if (!m || !m.vp.clientWidth) return;
+    m.dpr = window.devicePixelRatio || 1;
+    m.canvas.width = Math.round(m.vp.clientWidth * m.dpr);
+    m.canvas.height = Math.round(m.vp.clientHeight * m.dpr);
+    this._draw();
+  }
+  _schedule() {
+    const m = this._map; if (!m || m.raf) return;
+    m.raf = requestAnimationFrame(() => { m.raf = 0; this._draw(); });
+  }
+  _clamp() {
+    const m = this._map, w = m.vp.clientWidth, h = m.vp.clientHeight, sw = STAGE * m.s;
+    m.tx = sw <= w ? (w - sw) / 2 : Math.max(Math.min(0, w - sw), Math.min(0, m.tx));
+    m.ty = sw <= h ? (h - sw) / 2 : Math.max(Math.min(0, h - sw), Math.min(0, m.ty));
+  }
+  _zoomAt(cx, cy, factor) {
+    const m = this._map, ns = Math.max(m.minS, Math.min(4, m.s * factor)), k = ns / m.s;
+    m.tx = cx - (cx - m.tx) * k; m.ty = cy - (cy - m.ty) * k; m.s = ns; this._clamp(); this._schedule();
+  }
+  _fitBox(x0, y0, x1, y1, pad) {
+    const m = this._map, w = m.vp.clientWidth, h = m.vp.clientHeight, f = STAGE / CAL.size;
+    const bx = x0 * f - pad, by = y0 * f - pad, bw = (x1 - x0) * f + pad * 2, bh = (y1 - y0) * f + pad * 2;
+    m.s = Math.max(m.minS, Math.min(4, Math.min(w / bw, h / bh)));
+    m.tx = (w - bw * m.s) / 2 - bx * m.s; m.ty = (h - bh * m.s) / 2 - by * m.s;
+    this._clamp(); this._schedule();
+  }
+  _fitGalaxy() {
+    const m = this._map; if (!m || !m.vp.clientWidth) return;
+    m.minS = Math.min(m.vp.clientWidth, m.vp.clientHeight) / STAGE; m.s = m.minS; this._clamp(); this._schedule();
+  }
+  _fitRoute() {
+    const m = this._map;
+    if (m.route?.segs?.length) {
+      const px = m.route.segs.flatMap((s) => [s.a, s.b]).map(([X, Y]) => [CAL.cx + X * CAL.k, CAL.cy - Y * CAL.k]);
+      const xs = px.map((p) => p[0]), ys = px.map((p) => p[1]);
+      return this._fitBox(Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys), 300);
+    }
+    const a = m.o && posOf(m.o), b = m.dst && posOf(m.dst); if (!a || !b) return;
+    this._fitBox(Math.min(a[0], b[0]), Math.min(a[1], b[1]), Math.max(a[0], b[0]), Math.max(a[1], b[1]), 700);
+  }
+  _drawChart(o, dst, route) {
+    const m = this._map; if (!m) return;
+    m.o = o; m.dst = dst; m.route = route;
+    if (o && dst && o.name !== dst.name) this._fitRoute(); else this._schedule();
+  }
+
+  _draw() {
+    const m = this._map; if (!m) return;
+    const { ctx, canvas, dpr, s, tx, ty } = m, { byName } = getData();
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
+    if (m.img) {
+      ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = "high";
+      ctx.drawImage(m.img, 0, 0, CAL.size, CAL.size, tx, ty, STAGE * s, STAGE * s);
+    }
+    const K = (STAGE / CAL.size) * s;
+    const SP = (p) => { const im = posOf(p); return im ? [tx + im[0] * K, ty + im[1] * K] : null; };
+    const XYc = ([X, Y]) => [tx + (CAL.cx + X * CAL.k) * K, ty + (CAL.cy - Y * CAL.k) * K];
+    const o = m.o, dst = m.dst, showLabel = s > (m.minS || 0.01) * 1.15;
+    const label = (x, y, txt, col, size) => {
+      ctx.font = `700 ${size}px Orbitron, system-ui, sans-serif`; ctx.lineWidth = 3;
+      ctx.strokeStyle = "rgba(5,7,12,.9)"; ctx.lineJoin = "round";
+      ctx.strokeText(txt, x, y); ctx.fillStyle = col; ctx.fillText(txt, x, y);
+    };
+    // route calculée : segments colorés par classe
+    if (m.route?.segs && o && dst && o.name !== dst.name) {
+      ctx.lineCap = "round";
+      for (const seg of m.route.segs) {
+        const [col, w2, dash] = SEG_STYLE[seg.cls];
+        const [x1, y1] = XYc(seg.a), [x2, y2] = XYc(seg.b);
+        ctx.setLineDash(dash); ctx.strokeStyle = col; ctx.lineWidth = w2; ctx.globalAlpha = .95;
+        ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+      }
+      ctx.setLineDash([]); ctx.globalAlpha = 1;
+    } else if (o && dst && o.name !== dst.name) {
+      const po = SP(o), pdt = SP(dst);
+      if (po && pdt) { ctx.setLineDash([8, 6]); ctx.strokeStyle = "#57c7ff"; ctx.lineWidth = 2.6; ctx.beginPath(); ctx.moveTo(po[0], po[1]); ctx.lineTo(pdt[0], pdt[1]); ctx.stroke(); ctx.setLineDash([]); }
+    }
+    // favoris (or)
+    for (const name of m.favSet || []) {
+      const p = byName[name]; if (!p || (o && p.name === o.name) || (dst && p.name === dst.name)) continue;
+      const sp = SP(p); if (!sp) continue;
+      ctx.fillStyle = "#d9b45b"; ctx.beginPath(); ctx.arc(sp[0], sp[1], 4.5, 0, 7); ctx.fill();
+      if (showLabel) label(sp[0] + 9, sp[1] + 4, p.name, "#e6c66c", 13);
+    }
+    // origine / destination
+    const marker = (p, col) => {
+      const sp = SP(p); if (!sp) return;
+      ctx.strokeStyle = col; ctx.lineWidth = 2.4; ctx.beginPath(); ctx.arc(sp[0], sp[1], 13, 0, 7); ctx.stroke();
+      ctx.fillStyle = col; ctx.beginPath(); ctx.arc(sp[0], sp[1], 6, 0, 7); ctx.fill();
+      if (showLabel) label(sp[0] + 18, sp[1] + 5, p.name, col, 15);
+    };
+    if (o) marker(o, "#6fbf8f");
+    if (dst && dst.name !== (o && o.name)) marker(dst, "#57c7ff");
+  }
+
+  _hitTest(cx, cy) {
+    const m = this._map; if (!m) return null;
+    const { byName } = getData(), K = (STAGE / CAL.size) * m.s;
+    const cands = new Set([LEG.from, LEG.to, ...(m.favSet || [])].filter(Boolean));
+    let best = null, bestD = 13;
+    for (const name of cands) {
+      const p = byName[name], im = posOf(p); if (!im) continue;
+      const d = Math.hypot(m.tx + im[0] * K - cx, m.ty + im[1] * K - cy);
+      if (d < bestD) { bestD = d; best = name; }
+    }
+    return best;
+  }
+
+  /** Renseigne origine/destination depuis un preset (macros / fiches / favoris). */
   applyLeg(leg) {
     const root = this.element; if (!root) return;
     const f = root.querySelector("#an-from"), t = root.querySelector("#an-to");
@@ -215,23 +505,31 @@ export class AstronavApp extends foundry.applications.api.ApplicationV2 {
     const o = BY_NAME[from], dst = BY_NAME[to];
     if (!o || !dst) { res.innerHTML = `<b style="color:#e5544b">Monde inconnu : ${esc(!o ? from : to)}</b>`; return; }
     if (!o.xy || !dst.xy || o.name === dst.name) { res.innerHTML = `<b style="color:#e5544b">Itinéraire impossible (coordonnées manquantes ou mondes identiques).</b>`; return; }
-    const sh = { usure: Number(game.settings.get(MODULE, "usure")) || 0 };
+    const sh = { usure: Number(S("usure")) || 0 };
     const route = computeRoute(GRAPH, o, dst, hyper, { avoid, hostile: hostileSet() });
     if (!route) { res.innerHTML = `<b style="color:#e5544b">Aucun itinéraire trouvé.</b>`; return; }
     const chk = astroCheck(o, dst, route, sh), cost = tripCost(route, hyper), chal = Math.min(chk.upgrades, chk.diff);
     const pool = { difficulty: chk.diff - chal, ...(chal ? { challenge: chal } : {}), ...(chk.boost ? { boost: chk.boost } : {}), ...(chk.setback ? { setback: chk.setback } : {}) };
     this._last = { o, dst, route, chk, cost, pool, hyper };
+    const rf = S("resFuelLabel"), rv = S("resFoodLabel"), rr = S("resRepairLabel");
     res.innerHTML = `
       <div class="an-cells">
         <div class="an-cell"><div class="k">Itinéraire</div><div class="v">${route.cases.total.toFixed(1)} cases<small>${Math.round(((route.cases.major + route.cases.minor) / (route.cases.total || 1)) * 100)}% sur routes${route.hostile ? ` · ⚠️ ${route.hostile} hostile(s)` : avoid ? " · 🕶️ 0 hostile" : ""}</small></div></div>
         <div class="an-cell"><div class="k">Durée</div><div class="v">${fmtDays(route.days)}<small>hyperdrive ×${hyper}</small></div></div>
         <div class="an-cell"><div class="k">Difficulté</div><div class="v">${dice({ di: pool.difficulty, ch: chal, bo: chk.boost, se: chk.setback })}<small>${DN[chk.diff]}${chk.upgrades ? " ↑" + chk.upgrades : ""}</small></div></div>
         <div class="an-cell"><div class="k">Calcul</div><div class="v">${chk.calc}</div></div>
-        <div class="an-cell"><div class="k">Coût estimé</div><div class="v">−${cost.days}j · −${cost.fuel}⛽ · +${cost.usure}%🔧</div></div>
+        <div class="an-cell"><div class="k">Coût estimé</div><div class="v" style="font-size:12px">−${cost.days} ${esc(rv)} · −${cost.fuel} ${esc(rf)} · +${cost.usure}% usure</div></div>
       </div>
       <div class="an-parts">${chk.parts.map((p) => `${esc(p.label)} <b>${esc(p.tag)}</b>`).join(" · ")}</div>
       <div class="an-acts"><button type="button" class="an-btn cy" data-roll="1">🎲 Jet d'Astrogation → chat</button></div>`;
     res.querySelector("[data-roll]").addEventListener("click", () => this._roll());
+    // carte : tracer la route (mutation en place, pas de re-render)
+    this._drawChart(o, dst, route);
+    // coût exposé pour un traqueur de ressources externe (ex. fvtt-party-resources)
+    const api = game.modules.get(MODULE).api;
+    api.lastCost = { from: o.name, to: dst.name, days: cost.days, fuel: cost.fuel, usure: cost.usure,
+      labels: { food: rv, fuel: rf, repair: rr } };
+    Hooks.callAll("swffgAstronav.cost", api.lastCost);
   }
 
   async _roll() {
@@ -240,7 +538,7 @@ export class AstronavApp extends foundry.applications.api.ApplicationV2 {
     await ChatMessage.create({
       content: `<h4>🎲 Astrogation — ${esc(L.o.name)} → ${esc(L.dst.name)}</h4>`
         + `<p>Difficulté <strong>${DN[L.chk.diff]}</strong>${L.chk.upgrades ? " (↑" + L.chk.upgrades + ")" : ""} — ${dice({ di: L.pool.difficulty, ch: L.pool.challenge, bo: L.pool.boost, se: L.pool.setback })}</p>`
-        + `<p style="font-size:11px;opacity:.7">${fmtDays(L.route.days)} · ${L.route.cases.total.toFixed(1)} cases · coût ≈ −${L.cost.days}j / −${L.cost.fuel}⛽ / +${L.cost.usure}%🔧</p>`
+        + `<p style="font-size:11px;opacity:.7">${fmtDays(L.route.days)} · ${L.route.cases.total.toFixed(1)} cases</p>`
         + (hasFFG ? `<button class="ffg-pool-to-player">🎲 Lancer (obstacle dans le pool)</button>` : ""),
       flags: hasFFG ? { starwarsffg: { dicePool: L.pool, description: `Astrogation ${L.o.name}→${L.dst.name}`, roll: { data: {}, skillName: "Astrogation", item: {}, flavor: "", sound: null } } } : {},
     });
@@ -249,27 +547,16 @@ export class AstronavApp extends foundry.applications.api.ApplicationV2 {
 }
 
 /* ------------------------------------------- presets « départ / arrivée » --- */
-// Monde partagé entre le compendium/les macros et les fenêtres ouvertes.
 export const LEG = { from: null, to: null };
 
 function openWindows() {
-  // Foundry v13 : les ApplicationV2 vivent dans foundry.applications.instances,
-  // plus dans ui.windows (qui ne garde que les anciennes Application V1). On scanne les deux.
+  // Foundry v13 : les ApplicationV2 vivent dans foundry.applications.instances, plus dans ui.windows.
   const v2 = foundry.applications?.instances?.values?.() ?? [];
   return [...Object.values(ui.windows ?? {}), ...v2];
 }
-function legApps() {
-  // toute fenêtre ouverte sachant recevoir un preset (AstronavApp, ou le Command Deck
-  // d'un module tiers qui implémente applyLeg).
-  return openWindows().filter((w) => typeof w?.applyLeg === "function");
-}
-function dispatchLeg() {
-  const apps = legApps();
-  for (const a of apps) a.applyLeg?.(LEG);
-  return apps.length;
-}
+function legApps() { return openWindows().filter((w) => typeof w?.applyLeg === "function"); }
+function dispatchLeg() { const apps = legApps(); for (const a of apps) a.applyLeg?.(LEG); return apps.length; }
 
-/** Place un monde comme origine ("from") ou destination ("to") dans l'Astronav. */
 export async function setLeg(name, role) {
   await ensureData();
   if (!BY_NAME[name]) return ui.notifications.warn(`Astronav : monde inconnu « ${name} ».`);
@@ -277,14 +564,12 @@ export async function setLeg(name, role) {
   if (!dispatchLeg()) new AstronavApp().render(true);
   ui.notifications.info(`Astronav — ${role === "to" ? "arrivée" : "départ"} : ${name}.`);
 }
-/** Ouvre l'Astronav sur ce monde (comme origine) et affiche ses infos. */
 export async function showWorld(name) {
   await ensureData();
   if (!BY_NAME[name]) return ui.notifications.warn(`Astronav : monde inconnu « ${name} ».`);
   LEG.from = name;
   if (!dispatchLeg()) new AstronavApp().render(true);
 }
-/** Petit choix « Voir / Départ / Arrivée » pour un monde (nom résolu, sinon demandé). */
 export async function chooser(name) {
   await ensureData();
   const DialogV2 = foundry.applications.api.DialogV2;
@@ -325,12 +610,17 @@ Hooks.once("init", () => {
     name: "Usure du vaisseau (%)", hint: "Au-delà de 50 %, +1 à la difficulté ; au-delà de 80 %, +2.",
     scope: "world", config: true, type: Number, default: 0, range: { min: 0, max: 100, step: 5 },
   });
+  // Étiquettes des ressources consommées (le pool réel est suivi par fvtt-party-resources côté Holocron).
+  for (const [key, def] of [["resFoodLabel", "Vivres"], ["resFuelLabel", "Carburant"], ["resRepairLabel", "Pièce de réparation"]])
+    game.settings.register(MODULE, key, { name: `Ressource — ${def}`, scope: "world", config: true, type: String, default: def });
+
   const m = game.modules.get(MODULE);
   m.api = {
     ...(m.api || {}),
     open: () => new AstronavApp().render(true),
-    setLeg, showWorld, chooser, data: async () => { await ensureData(); return getData(); },
-    AstronavApp,
+    setLeg, showWorld, chooser, favorites: favoriteWorlds,
+    data: async () => { await ensureData(); return getData(); },
+    lastCost: null, AstronavApp,
   };
 });
 
@@ -342,3 +632,35 @@ Hooks.on("getSceneControlButtons", (controls) => {
     onChange: () => new AstronavApp().render(true), onClick: () => new AstronavApp().render(true) };
   Array.isArray(tools) ? tools.push(btn) : (tools.astronav = { ...btn, order: 99 });
 });
+
+/* ---- bouton « Astronav » sur les fiches planète (MEJ Place / compendium) ---- */
+function planetOf(doc) {
+  if (!doc) return null;
+  const isPlanet = doc.flags?.["monks-enhanced-journal"]?.pagetype === "place"
+    || doc.pack === `${MODULE}.planetes` || doc.flags?.[MODULE]?.xy
+    || doc.parent?.flags?.[MODULE];
+  return isPlanet ? (doc.parent?.name ?? doc.name) : null;
+}
+// v13 ApplicationV2 : contrôles d'en-tête.
+Hooks.on("getHeaderControlsApplicationV2", (app, controls) => {
+  const name = planetOf(app?.document); if (!name || !Array.isArray(controls)) return;
+  controls.push({ icon: "fa-solid fa-route", label: "SWFFG.astronav.setLeg", action: "swffgAstronav",
+    onClick: () => game.modules.get(MODULE).api.chooser(name) });
+});
+// Fallback DOM (fiche journal standard + fenêtre Monk's Enhanced Journal).
+function injectAstroBtn(app, html) {
+  try {
+    const doc = app?.document ?? app?.object;
+    const name = planetOf(doc); if (!name) return;
+    const root = html?.[0] ?? html?.element ?? html;
+    const header = root?.querySelector?.(".window-header"); if (!header || header.querySelector("[data-astronav]")) return;
+    const a = document.createElement("a");
+    a.className = "header-control"; a.dataset.astronav = "1"; a.title = "Astronav";
+    a.innerHTML = '<i class="fa-solid fa-route"></i>'; a.style.cssText = "margin:0 4px;cursor:pointer";
+    a.addEventListener("click", () => game.modules.get(MODULE).api.chooser(name));
+    (header.querySelector(".window-title") ?? header).after?.(a);
+    header.appendChild(a);
+  } catch { /* structure d'en-tête variable selon les versions */ }
+}
+for (const hook of ["renderJournalEntrySheet", "renderJournalSheet", "renderEnhancedJournal"])
+  Hooks.on(hook, (app, html) => injectAstroBtn(app, html));

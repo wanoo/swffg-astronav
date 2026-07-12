@@ -3,11 +3,11 @@
 Module [Foundry VTT](https://foundryvtt.com/) pour le système **Star Wars FFG** (`starwarsffg`).
 Deux outils en un :
 
-- **Calculateur d'astrogation** — choisis un monde d'origine et une destination parmi
-  ~6 800 systèmes, le module trace l'itinéraire par les **hyperroutes canon**, en déduit la
-  **difficulté du test d'Astrogation** (pool de dés FFG avec améliorations, boost et setback),
-  la **durée** et le **coût** du voyage, puis poste le jet dans le chat (obstacle intégré au
-  pool sur le système `starwarsffg`).
+- **Carte galactique + calculateur d'astrogation** — une **carte interactive** (fond GFFA,
+  pan/zoom, tracé de route A* coloré, marqueurs origine/destination/favoris) ; choisis deux
+  mondes (saisie, clic sur un marqueur, favori, ou bouton d'une fiche planète), le module trace
+  l'itinéraire par les **hyperroutes canon**, en déduit la **difficulté du test d'Astrogation**
+  (vrais glyphes de dés FFG), la **durée** et le **coût**, puis poste le jet dans le chat.
 - **Compendium « Planètes — Astronav »** — un atlas de **6 849 mondes** rangés par région
   (Noyau, Colonies, Bordure Extérieure, Régions Inconnues…), présentés en fiches
   **Monk's Enhanced Journal « Place »** : couverture image, localisation, et **favoris**.

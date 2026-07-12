@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.5.0
+
+- **Carte galactique interactive** dans la fenêtre Astronav : fond de carte GFFA, pan/zoom
+  (molette, glisser, pincement, boutons), **tracé de la route A*** en polyligne colorée
+  (grande route / secondaire / hors-réseau), marqueurs **origine** (vert) / **destination**
+  (bleu) / **favoris** (or). Bouton 🎯 pour cadrer le trajet, ⤢ pour la vue galaxie.
+- **Clic sur un marqueur** de la carte pour le définir origine/arrivée (radio 🛫/🛬, shift = l'autre).
+- **Fix difficulté** : les dés de difficulté s'affichent avec les **vrais glyphes FFG**
+  (police EotESymbol) au lieu des symboles Unicode `◆`/`■` — dans le panneau et dans le chat.
+- **Favoris MEJ** : les planètes mises en favori (étoile Monk's Enhanced Journal) sont épinglées
+  sur la carte et listées (chips cliquables) dans l'Astronav.
+- **Bouton « Astronav »** sur les fiches planète (en-tête) : envoie le monde en départ/arrivée.
+- **Réglages ressources** (Vivres / Carburant / Pièce de réparation) et coût du voyage exposé
+  via `api.lastCost` + hook `swffgAstronav.cost` (pour un traqueur externe type fvtt-party-resources).
+
 ## 1.4.1
 
 - **Fix Foundry v13** : la macro « ce monde » et le dispatch départ/arrivée cherchaient les
