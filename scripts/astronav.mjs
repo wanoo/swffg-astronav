@@ -27,6 +27,7 @@ const STAGE = 5400;
 const CAL = { cx: 2699.5, cy: 2490, k: 2.155, size: 5400 };
 const posOf = (p) => (p && p.xy) ? [CAL.cx + p.xy[0] * CAL.k, CAL.cy - p.xy[1] * CAL.k] : null;
 const SEG_STYLE = { major: ["#ffd76a", 3.4, []], minor: ["#c9a6ff", 3, []], off: ["#57c7ff", 2.6, [8, 6]] };
+const LANE_COL = { "Corellian Run": "#e6c66c", "Voie Perlemienne": "#8fd0ff", "Épine corellienne": "#f0a35c", "Voie Hydienne": "#a0dc8a", "Route de Rimma": "#d99bff" };
 
 function buildGraph(byName, lanes) {
   const idx = new Map(), nodes = [], adj = new Map();
@@ -119,7 +120,7 @@ export function fmtDays(d) {
 }
 
 /* ------------------------------------------------------- données + settings -- */
-let BY_NAME = null, GRAPH = null, LIST = null;
+let BY_NAME = null, GRAPH = null, LIST = null, LANES = null;
 export async function ensureData() {
   if (GRAPH) return getData();
   const [pj, lanes] = await Promise.all([
@@ -129,6 +130,7 @@ export async function ensureData() {
   const arr = Array.isArray(pj) ? pj : (pj.planets || pj.systems || Object.values(pj)[0]);
   BY_NAME = {}; for (const p of arr) BY_NAME[p.name] = p;
   LIST = arr.filter((p) => p.xy).map((p) => p.name).sort();
+  LANES = lanes;                       // gardées pour l'overlay hyperroutes (champ pts)
   GRAPH = buildGraph(BY_NAME, lanes);
   return getData();
 }
@@ -206,6 +208,9 @@ export class AstronavApp extends foundry.applications.api.ApplicationV2 {
         border-radius: 10px; background: #05070c; touch-action: none; cursor: grab; }
       .an-viewport.grabbing { cursor: grabbing; }
       .an-canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+      .an-lanetog { position: absolute; left: 8px; top: 8px; display: flex; gap: 4px; }
+      .an-lanetog button { border: 1px solid #2b5b73; background: #0c1926cc; color: #9db8c8; border-radius: 7px; padding: 3px 9px; font-size: 11px; cursor: pointer; }
+      .an-lanetog button.on { border-color: #d9b45b; color: #d9b45b; }
       .an-zoom { position: absolute; right: 8px; bottom: 8px; display: flex; gap: 4px; }
       .an-zoom button { width: 30px; height: 30px; border-radius: 7px; border: 1px solid #2b5b73; background: #0c1926cc; color: #d8ecf7; cursor: pointer; font-size: 15px; }
       .an-zoom button:hover { background: #14324a; }
@@ -238,6 +243,10 @@ export class AstronavApp extends foundry.applications.api.ApplicationV2 {
         <div class="an-map">
           <div class="an-viewport" id="an-vp">
             <canvas class="an-canvas" id="an-canvas"></canvas>
+            <div class="an-lanetog">
+              <button type="button" data-lane="major">Grandes routes</button>
+              <button type="button" data-lane="minor">Routes mineures</button>
+            </div>
             <div class="an-legend">
               <span><b style="color:#6fbf8f">●</b> origine</span>
               <span><b style="color:#57c7ff">●</b> destination</span>
@@ -308,9 +317,11 @@ export class AstronavApp extends foundry.applications.api.ApplicationV2 {
       vp, canvas, ctx: canvas.getContext("2d"),
       s: prev.s ?? 0.15, tx: prev.tx ?? 0, ty: prev.ty ?? 0, minS: prev.minS ?? 0.1, dpr: 1,
       img: prev.img, o: prev.o, dst: prev.dst, route: prev.route, favSet: prev.favSet ?? new Set(),
-      raf: 0, ro: null,
+      showLanes: prev.showLanes ?? true, showMinor: prev.showMinor ?? false, raf: 0, ro: null,
     };
     if (vp.dataset.anBound !== "1") { vp.dataset.anBound = "1"; this._bindMap(vp, canvas); }
+    root.querySelector('[data-lane="major"]')?.classList.toggle("on", this._map.showLanes);
+    root.querySelector('[data-lane="minor"]')?.classList.toggle("on", this._map.showMinor);
     // image de fond : chargée une fois, gardée sur l'instance
     if (!this._map.img) {
       const img = new Image();
@@ -351,6 +362,14 @@ export class AstronavApp extends foundry.applications.api.ApplicationV2 {
       drag = null; vp.classList.remove("grabbing");
     };
     vp.addEventListener("pointerup", end); vp.addEventListener("pointercancel", () => { drag = null; vp.classList.remove("grabbing"); });
+
+    vp.querySelector(".an-lanetog").addEventListener("click", (e) => {
+      const l = e.target.dataset.lane; if (!l) return;
+      const key = l === "major" ? "showLanes" : "showMinor";
+      this._map[key] = !this._map[key];
+      e.target.classList.toggle("on", this._map[key]);
+      this._schedule();
+    });
 
     vp.querySelector(".an-zoom").addEventListener("click", (e) => {
       const z = e.target.dataset.z; if (!z) return;
@@ -442,6 +461,21 @@ export class AstronavApp extends foundry.applications.api.ApplicationV2 {
       ctx.strokeStyle = "rgba(5,7,12,.9)"; ctx.lineJoin = "round";
       ctx.strokeText(txt, x, y); ctx.fillStyle = col; ctx.fillText(txt, x, y);
     };
+    // overlay hyperroutes : polylignes des tracés (data/lanes.json, champ pts)
+    if (LANES && (m.showLanes || m.showMinor)) {
+      ctx.lineCap = "round"; ctx.lineJoin = "round";
+      for (const l of LANES) {
+        if (l.major ? !m.showLanes : !m.showMinor) continue;
+        const pts = l.pts; if (!pts || pts.length < 2) continue;
+        ctx.strokeStyle = l.major ? (LANE_COL[l.name] || "#e6c66c") : "#9a86c9";
+        ctx.lineWidth = l.major ? 2.6 : 1.3; ctx.globalAlpha = l.major ? .9 : .55;
+        ctx.beginPath();
+        pts.forEach((pt, i) => { const [x, y] = XYc(pt); if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y); });
+        ctx.stroke();
+        if (showLabel && l.major) { const [mx, my] = XYc(pts[Math.floor(pts.length / 2)]); label(mx + 10, my - 6, l.name, LANE_COL[l.name] || "#e6c66c", 12); }
+      }
+      ctx.globalAlpha = 1;
+    }
     // route calculée : segments colorés par classe
     if (m.route?.segs && o && dst && o.name !== dst.name) {
       ctx.lineCap = "round";
