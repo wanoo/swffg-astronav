@@ -252,10 +252,16 @@ export class AstronavApp extends foundry.applications.api.ApplicationV2 {
 // Monde partagé entre le compendium/les macros et les fenêtres ouvertes.
 export const LEG = { from: null, to: null };
 
+function openWindows() {
+  // Foundry v13 : les ApplicationV2 vivent dans foundry.applications.instances,
+  // plus dans ui.windows (qui ne garde que les anciennes Application V1). On scanne les deux.
+  const v2 = foundry.applications?.instances?.values?.() ?? [];
+  return [...Object.values(ui.windows ?? {}), ...v2];
+}
 function legApps() {
   // toute fenêtre ouverte sachant recevoir un preset (AstronavApp, ou le Command Deck
   // d'un module tiers qui implémente applyLeg).
-  return Object.values(ui.windows ?? {}).filter((w) => typeof w?.applyLeg === "function");
+  return openWindows().filter((w) => typeof w?.applyLeg === "function");
 }
 function dispatchLeg() {
   const apps = legApps();

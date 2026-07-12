@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.4.1
+
+- **Fix Foundry v13** : la macro « ce monde » et le dispatch départ/arrivée cherchaient les
+  fenêtres ouvertes dans `ui.windows`, or en v13 les sheets/apps sont des ApplicationV2 dans
+  `foundry.applications.instances`. Détection désormais sur les deux registres → la macro
+  détecte à nouveau la fiche planète ouverte et remplit le calculateur déjà affiché.
+
 ## 1.4.0
 
 - **Le tableau de bord Navi-Computer quitte ce module** : il devient le module séparé
