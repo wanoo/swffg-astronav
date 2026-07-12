@@ -8,7 +8,7 @@
  * Dépend de Monk's Enhanced Journal (favoris = marque-pages MEJ sur les fiches planètes).
  */
 
-export const MODULE = "swffg-astronav";
+export const MODULE = "swffg-astronavigation";
 export const asset = (p) => `modules/${MODULE}/${p}`;
 
 /* ------------------------------------------------------------------ moteur -- */
@@ -168,7 +168,7 @@ export async function favoriteWorlds() {
 /* ------------------------------------------------------------------ l'app --- */
 export class AstronavApp extends foundry.applications.api.ApplicationV2 {
   static DEFAULT_OPTIONS = {
-    id: "swffg-astronav-app",
+    id: "swffg-astronavigation-app",
     window: { title: "SWFFG.astronav.title", icon: "fa-solid fa-route", resizable: true },
     position: { width: 1180, height: 760 },
   };

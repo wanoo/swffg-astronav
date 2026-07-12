@@ -12,7 +12,7 @@ const dest = path.join(HERE, "packs", "macros");
 // Macro « ce monde » : détecte la fiche planète ouverte (sinon demande), puis
 // propose Voir / Départ / Arrivée via l'API du module.
 const command = [
-  'const api = game.modules.get("swffg-astronav")?.api;',
+  'const api = game.modules.get("swffg-astronavigation")?.api;',
   'if (!api?.chooser) { ui.notifications.error("Active le module « SWFFG Astronav »."); }',
   'else {',
   '  // fiche planète ouverte = JournalEntry, ou JournalEntryPage/entrée exposée par Monk\'s Enhanced Journal.',

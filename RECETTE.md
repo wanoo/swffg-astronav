@@ -16,10 +16,10 @@ Table de matières : [0. Installation](#0-installation) · [1. Compendium](#1-co
 
 | # | Objectif | Étapes | Résultat attendu | ✅/❌ |
 |---|----------|--------|------------------|------|
-| 0.1 | Installer par manifeste | Configuration → Modules → Installer un module → coller `https://sw-wanoo-holocron.cleverapps.io/modules/swffg-astronav/module.json` → Installer | Le module **SWFFG Astronav 1.1.1** apparaît, sans erreur de téléchargement. | |
+| 0.1 | Installer par manifeste | Configuration → Modules → Installer un module → coller `https://sw-wanoo-holocron.cleverapps.io/modules/swffg-astronavigation/module.json` → Installer | Le module **SWFFG Astronav 1.1.1** apparaît, sans erreur de téléchargement. | |
 | 0.2 | Mise à jour détectée | Si une 1.1.0 était installée : rouvrir la liste des modules | Foundry propose la mise à jour vers **1.1.1**. | |
 | 0.3 | Activer | Dans un monde starwarsffg : Gérer les modules → cocher SWFFG Astronav → Enregistrer | Le monde recharge sans erreur en console (F12). | |
-| 0.4 | Console propre | Ouvrir la console (F12) après rechargement | Aucune erreur `swffg-astronav` (les logs `Astronav`/`Navi` éventuels sont informatifs). | |
+| 0.4 | Console propre | Ouvrir la console (F12) après rechargement | Aucune erreur `swffg-astronavigation` (les logs `Astronav`/`Navi` éventuels sont informatifs). | |
 
 ---
 
@@ -41,10 +41,10 @@ Table de matières : [0. Installation](#0-installation) · [1. Compendium](#1-co
 
 | # | Objectif | Étapes | Résultat attendu | ✅/❌ |
 |---|----------|--------|------------------|------|
-| 1b.1 | MEJ requis | Installer swffg-astronav sans MEJ | Foundry signale la dépendance et propose d'installer **Monk's Enhanced Journal**. | |
+| 1b.1 | MEJ requis | Installer swffg-astronavigation sans MEJ | Foundry signale la dépendance et propose d'installer **Monk's Enhanced Journal**. | |
 | 1b.2 | Rendu Place | MEJ actif, ouvrir **Tatooine** | S'ouvre en sheet **« Place »** : couverture image en en-tête, **Type de lieu** = région, **Localisation** = secteur ; corps = description + lieux notables + tableau réduit. | |
 | 1b.3 | Ilum conforme | Ouvrir **Ilum** | placetype = Régions Inconnues, location = Secteur 7G, districts (attribut) = K-6 ; couverture = image locale ; tableau = Terrain/Population/Affiliations/Espèces/Cartographie. | |
-| 1b.4 | Images en dur | Inspecter la couverture (clic droit image → copier l'adresse) | Chemin **`modules/swffg-astronav/img/planets/…`** — aucun lien `wikia`. Image visible hors-ligne. | |
+| 1b.4 | Images en dur | Inspecter la couverture (clic droit image → copier l'adresse) | Chemin **`modules/swffg-astronavigation/img/planets/…`** — aucun lien `wikia`. Image visible hors-ligne. | |
 | 1b.5 | Favori MEJ | Ajouter Tatooine aux favoris/marque-pages MEJ | Le monde apparaît dans la barre de favoris ; persiste après réouverture (fonction native MEJ). | |
 | 1b.6 | Sans image | Ouvrir un monde sans visuel (ex. un système mineur) | Sheet Place sans couverture, champs et tableau corrects, pas d'erreur. | |
 | 1b.7 | Macro depuis Place | Fiche Place ouverte, lancer **🧭 Astronav — ce monde** | Menu titré au nom du monde ; **Départ/Arrivée** remplissent le calculateur (détection page/entrée MEJ OK). | |
@@ -55,7 +55,7 @@ Table de matières : [0. Installation](#0-installation) · [1. Compendium](#1-co
 | # | Objectif | Étapes | Résultat attendu | ✅/❌ |
 |---|----------|--------|------------------|------|
 | 2.1 | Bouton de scène | Barre de contrôles gauche, groupe **Jetons** | Un bouton **route** (icône fa-route). Un clic ouvre « Astronav — Astrogation ». | |
-| 2.2 | Ouverture API | Console : `game.modules.get("swffg-astronav").api.open()` | La fenêtre s'ouvre. | |
+| 2.2 | Ouverture API | Console : `game.modules.get("swffg-astronavigation").api.open()` | La fenêtre s'ouvre. | |
 | 2.3 | Autocomplétion | Cliquer le champ **Origine** | La liste propose des mondes (datalist ~6800 noms). | |
 | 2.4 | Calcul nominal | Origine **Coruscant**, Destination **Tatooine**, Hyperdrive ×1 → **Calculer** | 5 cellules : Itinéraire (cases + % sur routes), Durée, Difficulté (dés colorés + libellé), Calcul (temps), Coût estimé. Ligne de détail des modificateurs. | |
 | 2.5 | Mode discret | Cocher **🕶️ discret**, recalculer une route passant près de l'Empire | Le nombre de mondes hostiles baisse (idéalement « 🕶️ 0 hostile »), la difficulté peut changer. | |
@@ -108,7 +108,7 @@ Table de matières : [0. Installation](#0-installation) · [1. Compendium](#1-co
 | # | Objectif | Étapes | Résultat attendu | ✅/❌ |
 |---|----------|--------|------------------|------|
 | 6.1 | Bouton de scène | Barre de scène, groupe Jetons | **route** = calculateur d'astrogation, ordre stable. | |
-| 6.2 | API complète | Console : `game.modules.get("swffg-astronav").api` | Expose `open`, `setLeg`, `showWorld`, `chooser`, `data`, `AstronavApp`. | |
+| 6.2 | API complète | Console : `game.modules.get("swffg-astronavigation").api` | Expose `open`, `setLeg`, `showWorld`, `chooser`, `data`, `AstronavApp`. | |
 | 6.3 | Langue | Basculer Foundry en anglais puis français | Titres de fenêtres traduits (Astrogation / Dashboard). | |
 | 6.4 | Rechargement à froid | Recharger la page (F5), rouvrir le calculateur | Les données planètes se chargent (1er calcul peut être légèrement plus lent). | |
 | 6.5 | Perf données | Ouvrir le calculateur, mesurer | Chargement < ~2 s, calcul d'itinéraire quasi instantané. | |

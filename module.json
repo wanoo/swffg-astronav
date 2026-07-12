@@ -1,8 +1,8 @@
 {
-  "id": "swffg-astronav",
-  "title": "SWFFG Astronav — Astrogation & Atlas galactique",
+  "id": "swffg-astronavigation",
+  "title": "SWFFG Astronavigation — Astrogation & Atlas galactique",
   "description": "Calculateur d'astrogation pour Star Wars FFG : itinéraire par hyperroutes canon entre ~6800 mondes, difficulté du test d'Astrogation (pool de dés, améliorations, boost/setback), durée et coût du voyage, jet posté dans le chat. Inclut un compendium « Planètes — Astronav » de 6849 systèmes rangés par région (image, secteur, coordonnées, terrain, climat, gravité, population, affiliations, description). Astrogation calculator + a 6849-planet gazetteer compendium for the Star Wars FFG system.",
-  "version": "1.5.1",
+  "version": "1.5.2",
   "authors": [
     {
       "name": "wanoo"
@@ -80,7 +80,7 @@
       "path": "lang/fr.json"
     }
   ],
-  "url": "https://github.com/wanoo/swffg-astronav",
-  "manifest": "https://github.com/wanoo/swffg-astronav/releases/latest/download/module.json",
-  "download": "https://github.com/wanoo/swffg-astronav/releases/latest/download/swffg-astronav.zip"
+  "url": "https://github.com/wanoo/swffg-astronavigation",
+  "manifest": "https://github.com/wanoo/swffg-astronavigation/releases/latest/download/module.json",
+  "download": "https://github.com/wanoo/swffg-astronavigation/releases/latest/download/swffg-astronavigation.zip"
 }

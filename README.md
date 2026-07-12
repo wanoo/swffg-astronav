@@ -24,14 +24,14 @@ Ce module **requiert [Monk's Enhanced Journal](https://foundryvtt.com/packages/m
 Dans Foundry : **Add-on Modules → Install Module**, puis colle l'URL du manifeste :
 
 ```
-https://github.com/wanoo/swffg-astronav/releases/latest/download/module.json
+https://github.com/wanoo/swffg-astronavigation/releases/latest/download/module.json
 ```
 
 Active le module. Un bouton **route** apparaît dans la barre de contrôles de scène (groupe jetons)
 et ouvre le calculateur d'astrogation. Via l'API :
 
 ```js
-const api = game.modules.get("swffg-astronav").api;
+const api = game.modules.get("swffg-astronavigation").api;
 api.open();            // calculateur d'astrogation
 ```
 
@@ -46,7 +46,7 @@ ce monde comme **départ** 🛫, **arrivée** 🛬, ou simplement de le **voir**
 Sans fiche ouverte, elle demande le nom du monde. En API :
 
 ```js
-const api = game.modules.get("swffg-astronav").api;
+const api = game.modules.get("swffg-astronavigation").api;
 api.setLeg("Tatooine", "to");   // définir comme arrivée
 api.showWorld("Coruscant");     // ouvrir l'Astronav sur ce monde
 api.chooser("Ilum");            // menu Voir / Départ / Arrivée
@@ -67,7 +67,7 @@ Le compendium est livré compilé (LevelDB, `packs/planetes`). Pour le régéné
 npm install @foundryvtt/foundryvtt-cli classic-level
 python3 build_pack.py            # génère packs/_source/*.json depuis data/planets.json
 node build_pack.mjs              # compile -> packs/planetes (LevelDB)
-python3 build.py --zip           # produit dist/swffg-astronav.zip
+python3 build.py --zip           # produit dist/swffg-astronavigation.zip
 ```
 
 ## Données & crédits

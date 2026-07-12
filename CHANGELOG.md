@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.5.2
+
+- **Renommage** du module : `swffg-astronav` → **`swffg-astronavigation`** (uniformisation avec
+  swffg-workshops / swffg-sabacc / swffg-holocron). Nouveaux id, chemins d'images, dépôt et URLs.
+  ⚠️ Désinstaller l'ancien `swffg-astronav` et réinstaller depuis le nouveau manifeste.
+
 ## 1.5.1
 
 - **Overlay hyperroutes** sur la carte : deux bascules (Grandes routes / Routes mineures)
@@ -41,7 +47,7 @@
   Type de lieu (région) / Localisation (secteur) / districts (coordonnées), et **favoris MEJ**.
   **Monk's Enhanced Journal devient requis** (`relationships.requires`).
 - **Images en dur dans le module** (plus de hotlink Wookieepedia) : 2429 visuels dans
-  `img/planets/`, chemins locaux `modules/swffg-astronav/img/planets/…`.
+  `img/planets/`, chemins locaux `modules/swffg-astronavigation/img/planets/…`.
 - Tableau réduit (région/secteur/coord passés dans les champs MEJ) ; contenu réordonné
   (description → lieux notables → campagne → tableau → légendes).
 - La macro « ce monde » détecte aussi la fiche exposée par MEJ (page ou entrée).
@@ -74,6 +80,6 @@
 
 - Calculateur d'astrogation (ApplicationV2) : itinéraire par hyperroutes canon, difficulté du
   test d'Astrogation FFG (pool de dés, améliorations, boost/setback), durée et coût, jet au chat.
-- Bouton dans les contrôles de scène + API `game.modules.get("swffg-astronav").api.open()`.
+- Bouton dans les contrôles de scène + API `game.modules.get("swffg-astronavigation").api.open()`.
 - Paramètres : factions hostiles (mode discret), usure du vaisseau.
 - Compendium « Planètes — Astronav » : 6849 systèmes, 10 dossiers de région, fiches complètes.

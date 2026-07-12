@@ -2,7 +2,7 @@
 """Assemble le module distribuable.
 
   python3 build_pack.py && node build_pack.mjs   # (re)construit le compendium LevelDB
-  python3 build.py --zip                          # produit dist/swffg-astronav.zip
+  python3 build.py --zip                          # produit dist/swffg-astronavigation.zip
 
 Le zip embarque module.json, scripts/, data/, lang/ et le pack compilé packs/planetes.
 Sont exclus : les sources du pack (packs/_source), l'outillage de build, node_modules.

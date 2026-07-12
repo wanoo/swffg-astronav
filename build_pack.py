@@ -113,7 +113,7 @@ def main():
     n = 0
     for p in sorted(planets, key=lambda x: x.get("name", "")):
         reg = (p.get("region") or "").strip()
-        img = p.get("img")                     # chemin local (modules/swffg-astronav/img/...)
+        img = p.get("img")                     # chemin local (modules/swffg-astronavigation/img/...)
         jid, pid = fid(), fid()
         mej_page = {
             "type": "place",
@@ -140,7 +140,7 @@ def main():
                 "flags": {"monks-enhanced-journal": mej_page}, "_stats": {}
             }],
             "flags": {
-                "swffg-astronav": {k: p.get(k) for k in
+                "swffg-astronavigation": {k: p.get(k) for k in
                     ("region", "sector", "coord", "grid", "xy", "charted", "img") if p.get(k) is not None},
                 "monks-enhanced-journal": mej_entry,
             },

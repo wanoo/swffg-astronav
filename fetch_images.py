@@ -4,7 +4,7 @@
 - Source pristine : data/planets.raw.json (URLs d'origine). Créée au 1er lancement depuis
   data/planets.json si absente.
 - Sortie : img/planets/<slug>-<hash>.<ext> + data/planets.json réécrit avec des chemins
-  locaux Foundry `modules/swffg-astronav/img/planets/...`.
+  locaux Foundry `modules/swffg-astronavigation/img/planets/...`.
 Reprenable : les fichiers déjà présents ne sont pas re-téléchargés.
 
 Usage : python3 fetch_images.py
@@ -16,8 +16,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 IMG_DIR = os.path.join(HERE, "img", "planets")
 RAW = os.path.join(HERE, "data", "planets.raw.json")
 OUT = os.path.join(HERE, "data", "planets.json")
-MOD_PATH = "modules/swffg-astronav/img/planets"
-UA = {"User-Agent": "swffg-astronav/1.0 (Foundry module image bundling)"}
+MOD_PATH = "modules/swffg-astronavigation/img/planets"
+UA = {"User-Agent": "swffg-astronavigation/1.0 (Foundry module image bundling)"}
 EXTS = (".png", ".jpg", ".jpeg", ".webp", ".gif")
 
 def ensure_raw():
