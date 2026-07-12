@@ -107,6 +107,7 @@ function astroCheck(o, dst, route, sh) {
   if (of > .4) { setback += 2; parts.push({ label: "Hors réseau", tag: "+2 se" }); }
   if (route.hostile > 0) { const s = Math.min(route.hostile, 3); setback += s; parts.push({ label: route.hostile + " monde(s) hostile(s)", tag: "+" + s + " se" }); }
   else if (route.avoid) { parts.push({ label: "Discret — 0 hostile", tag: "✓" }); }
+  if (sh && sh.diffMod) { raw = Math.max(1, raw + sh.diffMod); parts.push({ label: sh.diffMod > 0 ? "Voyages difficiles (MJ)" : "Voyages faciles (MJ)", tag: (sh.diffMod > 0 ? "+" : "") + sh.diffMod }); }
   let up = 0, diff = raw; if (raw > 5) { up = raw - 5; diff = 5; parts.push({ label: up + " amélioration(s)", tag: "↑" + up }); }
   diff = Math.max(1, Math.min(5, diff));
   return { diff, boost, setback, upgrades: up, parts, calc: up ? "4 heures (Redoutable+)" : CT[diff] };
@@ -137,6 +138,31 @@ export async function ensureData() {
 export const getData = () => ({ byName: BY_NAME, graph: GRAPH, list: LIST });
 export const hostileSet = () => new Set(String(game.settings.get(MODULE, "hostile") || "").split(",").map((s) => s.trim()).filter(Boolean));
 const S = (k) => game.settings.get(MODULE, k);
+const allAffiliations = () => {
+  const s = new Set();
+  for (const p of Object.values(BY_NAME || {})) for (const a of (p.f?.aff || [])) if (a) s.add(a);
+  return [...s].sort((a, b) => a.localeCompare(b, "fr"));
+};
+
+/** Menu de réglage « factions hostiles » : cases à cocher au lieu d'un CSV. */
+class HostileMenu extends foundry.applications.api.ApplicationV2 {
+  static DEFAULT_OPTIONS = { id: "swffg-astronavigation-hostile", window: { title: "Factions hostiles — mode discret", icon: "fa-solid fa-skull" }, position: { width: 460 } };
+  async render() {
+    await ensureData();
+    const cur = hostileSet(), affs = allAffiliations();
+    const content = `<p style="opacity:.8;margin:.2em 0 .6em">Mondes de ces allégeances évités en mode « 🕶️ discret ».</p>
+      <div style="max-height:55vh;overflow:auto;display:grid;grid-template-columns:1fr 1fr;gap:2px 10px">
+      ${affs.map((a) => `<label style="display:flex;gap:6px;align-items:center"><input type="checkbox" name="${esc(a)}" ${cur.has(a) ? "checked" : ""}/> ${esc(a)}</label>`).join("")}</div>`;
+    const res = await foundry.applications.api.DialogV2.wait({
+      window: { title: "Factions hostiles — mode discret" }, position: { width: 460 }, content,
+      buttons: [
+        { action: "ok", label: "Enregistrer", default: true, callback: (ev, btn) => [...btn.form.querySelectorAll("input:checked")].map((i) => i.name) },
+        { action: "cancel", label: "Annuler" },
+      ], rejectClose: false,
+    }).catch(() => null);
+    if (Array.isArray(res)) await game.settings.set(MODULE, "hostile", res.join(", "));
+  }
+}
 
 export const esc = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
 
@@ -226,8 +252,8 @@ export class AstronavApp extends foundry.applications.api.ApplicationV2 {
           <div class="an-form">
             <div class="an-f"><label>Origine</label><input id="an-from" list="an-pl" value="${esc(LEG.from || "Coruscant")}"/></div>
             <div class="an-f"><label>Destination</label><input id="an-to" list="an-pl" placeholder="Tatooine" value="${esc(LEG.to || "")}"/></div>
-            <div class="an-f" style="flex:0 0 84px"><label>Hyperdrive</label><select id="an-hyper">
-              ${[0.5, 1, 2, 3, 4].map((h) => `<option value="${h}" ${h === 1 ? "selected" : ""}>×${h}</option>`).join("")}</select></div>
+            <div class="an-f" style="flex:0 0 150px"><label>Hyperdrive</label><select id="an-hyper">
+              ${[[0.5, "Classe 0.5 — rapide"], [1, "Classe 1"], [2, "Classe 2"], [3, "Classe 3"], [4, "Classe 4 — lent"]].map(([h, l]) => `<option value="${h}" ${h === 1 ? "selected" : ""}>${l}</option>`).join("")}</select></div>
             <label style="display:flex;gap:4px;align-items:center;font-size:11px"><input type="checkbox" id="an-avoid"/> 🕶️ discret</label>
             <button type="button" class="an-btn" data-act="compute">Calculer</button>
           </div>
@@ -343,7 +369,7 @@ export class AstronavApp extends foundry.applications.api.ApplicationV2 {
 
     let drag = null, moved = 0;
     vp.addEventListener("pointerdown", (e) => {
-      if (e.target.closest(".an-zoom")) return;
+      if (e.target.closest(".an-zoom, .an-lanetog")) return;   // ne pas capturer le pointeur sur les boutons (sinon le clic est avalé)
       drag = { x: e.clientX, y: e.clientY, tx: this._map.tx, ty: this._map.ty }; moved = 0;
       vp.setPointerCapture(e.pointerId); vp.classList.add("grabbing");
     });
@@ -540,7 +566,7 @@ export class AstronavApp extends foundry.applications.api.ApplicationV2 {
     const o = BY_NAME[from], dst = BY_NAME[to];
     if (!o || !dst) { res.innerHTML = `<b style="color:#e5544b">Monde inconnu : ${esc(!o ? from : to)}</b>`; return; }
     if (!o.xy || !dst.xy || o.name === dst.name) { res.innerHTML = `<b style="color:#e5544b">Itinéraire impossible (coordonnées manquantes ou mondes identiques).</b>`; return; }
-    const sh = { usure: Number(S("usure")) || 0 };
+    const sh = { usure: Number(S("usure")) || 0, diffMod: Number(S("travelDifficulty")) || 0 };
     const route = computeRoute(GRAPH, o, dst, hyper, { avoid, hostile: hostileSet() });
     if (!route) { res.innerHTML = `<b style="color:#e5544b">Aucun itinéraire trouvé.</b>`; return; }
     const chk = astroCheck(o, dst, route, sh), cost = tripCost(route, hyper), chal = Math.min(chk.upgrades, chk.diff);
@@ -637,13 +663,21 @@ export async function chooser(name) {
 
 /* --------------------------------------------------------------- amorçage --- */
 Hooks.once("init", () => {
-  game.settings.register(MODULE, "hostile", {
-    name: "Factions hostiles", hint: "Séparées par des virgules. Le mode « discret » évite leurs mondes.",
-    scope: "world", config: true, type: String, default: "Empire, Premier Ordre",
+  game.settings.register(MODULE, "hostile", {   // édité par le menu à cases à cocher (caché de la liste)
+    name: "Factions hostiles", scope: "world", config: false, type: String, default: "Empire, Premier Ordre",
+  });
+  game.settings.registerMenu(MODULE, "hostileMenu", {
+    name: "Factions hostiles (mode discret)", label: "Choisir les factions…", icon: "fa-solid fa-skull",
+    hint: "Coche les allégeances dont les mondes sont évités en mode discret.", type: HostileMenu, restricted: true,
   });
   game.settings.register(MODULE, "usure", {
     name: "Usure du vaisseau (%)", hint: "Au-delà de 50 %, +1 à la difficulté ; au-delà de 80 %, +2.",
     scope: "world", config: true, type: Number, default: 0, range: { min: 0, max: 100, step: 5 },
+  });
+  game.settings.register(MODULE, "travelDifficulty", {
+    name: "Difficulté des voyages", hint: "Décale la difficulté d'astrogation. Milieu = règles FFG.",
+    scope: "world", config: true, type: Number, default: 0,
+    choices: { "-2": "Très facile (−2)", "-1": "Facile (−1)", "0": "Normal (règles FFG)", "1": "Difficile (+1)", "2": "Très difficile (+2)" },
   });
   // Étiquettes des ressources consommées (le pool réel est suivi par fvtt-party-resources côté Holocron).
   for (const [key, def] of [["resFoodLabel", "Vivres"], ["resFuelLabel", "Carburant"], ["resRepairLabel", "Pièce de réparation"]])
