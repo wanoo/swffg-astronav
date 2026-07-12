@@ -281,7 +281,7 @@ export class AstronavApp extends foundry.applications.api.ApplicationV2 {
       <div class="an-cols">
         <div class="an-side">
           <div class="an-form">
-            <div class="an-f"><label>Origine</label><input id="an-from" list="an-pl" value="${esc(LEG.from || "Coruscant")}"/></div>
+            <div class="an-f"><label>Origine</label><input id="an-from" list="an-pl" value="${esc(LEG.from || currentWorld() || "Coruscant")}"/></div>
             <div class="an-f"><label>Destination</label><input id="an-to" list="an-pl" placeholder="Tatooine" value="${esc(LEG.to || "")}"/></div>
             <div class="an-f" style="flex:0 0 150px"><label>Hyperdrive</label><select id="an-hyper">
               ${[[0.5, "Classe 0.5 — rapide"], [1, "Classe 1"], [2, "Classe 2"], [3, "Classe 3"], [4, "Classe 4 — lent"]].map(([h, l]) => `<option value="${h}" ${h === 1 ? "selected" : ""}>${l}</option>`).join("")}</select></div>
@@ -639,13 +639,17 @@ export class AstronavApp extends foundry.applications.api.ApplicationV2 {
 
   async _roll() {
     const L = this._last; if (!L) return;
+    // failsafe : on voyage depuis sa position actuelle (POI).
+    const cur = currentWorld();
+    if (cur && L.o.name !== cur) return ui.notifications.warn(`Astronav : votre position actuelle est « ${cur} ». Mets l'origine sur « ${cur} » avant le jet.`);
     const hasFFG = game.system.id === "starwarsffg";
+    PENDING_TRIP = { from: L.o.name, to: L.dst.name };   // un jet réussi déplacera le POI vers la destination
     await ChatMessage.create({
       content: `<h4>🎲 Astrogation — ${esc(L.o.name)} → ${esc(L.dst.name)}</h4>`
         + `<p>Difficulté <strong>${DN[L.chk.diff]}</strong>${L.chk.upgrades ? " (↑" + L.chk.upgrades + ")" : ""} — ${dice({ di: L.pool.difficulty, ch: L.pool.challenge, bo: L.pool.boost, se: L.pool.setback })}</p>`
         + `<p style="font-size:11px;opacity:.7">${fmtDays(L.route.days)} · ${L.route.cases.total.toFixed(1)} cases</p>`
         + (hasFFG ? `<button class="ffg-pool-to-player">🎲 Lancer (obstacle dans le pool)</button>` : ""),
-      flags: hasFFG ? { starwarsffg: { dicePool: L.pool, description: `Astrogation ${L.o.name}→${L.dst.name}`, roll: { data: {}, skillName: "Astrogation", item: {}, flavor: "", sound: null } } } : {},
+      flags: hasFFG ? { starwarsffg: { dicePool: L.pool, description: `Astrogation ${L.o.name}→${L.dst.name}`, roll: { data: { astronavTrip: { from: L.o.name, to: L.dst.name } }, skillName: "Astrogation", item: {}, flavor: "", sound: null } } } : {},
     });
     ui.notifications.info("Jet d'Astrogation posté dans le chat.");
   }
@@ -653,6 +657,21 @@ export class AstronavApp extends foundry.applications.api.ApplicationV2 {
 
 /* ------------------------------------------- presets « départ / arrivée » --- */
 export const LEG = { from: null, to: null };
+let PENDING_TRIP = null;   // voyage en attente d'un jet ; sur réussite → POI vers la destination
+
+// Un jet d'Astrogation réussi déplace la position courante (POI) vers la destination.
+Hooks.on("ffgDiceMessage", (roll) => {
+  try {
+    if (!PENDING_TRIP) return;
+    const trip = roll?.data?.astronavTrip;
+    const txt = [roll?.flavorText, roll?.data?.description, roll?.data?.skillName].filter(Boolean).join(" | ");
+    if (!trip && !/astrogation/i.test(txt)) return;               // pas notre jet
+    const net = (roll?.ffg?.success || 0) - (roll?.ffg?.failure || 0);
+    if (net <= 0) return;                                          // échec : on ne bouge pas
+    const dest = trip?.to || PENDING_TRIP.to; PENDING_TRIP = null;
+    if (dest && BY_NAME?.[dest]) setCurrentWorld(dest);
+  } catch { /* détection best-effort */ }
+});
 
 function openWindows() {
   // Foundry v13 : les ApplicationV2 vivent dans foundry.applications.instances, plus dans ui.windows.

@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.6.1
+
+- **Jet réussi → arrivée** : un jet d'Astrogation **réussi** (succès nets > 0) déplace
+  automatiquement la position courante (« vous êtes ici ») vers la **destination**.
+- **Failsafe** : le jet est bloqué si l'origine ≠ position actuelle (on voyage depuis là où
+  l'on est). L'origine par défaut est votre position courante.
+
 ## 1.6.0
 
 - **Import dans les journaux** : au 1er lancement (MJ), l'Astronav propose d'importer le compendium
