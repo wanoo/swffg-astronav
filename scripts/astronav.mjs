@@ -191,6 +191,37 @@ export async function favoriteWorlds() {
   return [...new Set(names)];
 }
 
+/* ---- position courante « vous êtes ici » (alimentée par le Holocron) ---- */
+export const currentWorld = () => (BY_NAME ? game.settings.get(MODULE, "currentWorld") : "") || "";
+export async function setCurrentWorld(name) {
+  await ensureData();
+  if (name && !BY_NAME[name]) return ui.notifications.warn(`Astronav : monde inconnu « ${name} ».`);
+  await game.settings.set(MODULE, "currentWorld", name || "");
+  for (const a of legApps()) a._loadCurrent?.();
+}
+
+/* ---- import du compendium dans les journaux du monde (requis MEJ + favoris) ---- */
+export async function importToWorld({ confirm = true } = {}) {
+  if (!game.user.isGM) return ui.notifications.warn("Réservé au MJ.");
+  const pack = game.packs.get(`${MODULE}.planetes`);
+  if (!pack) return ui.notifications.error("Compendium des planètes introuvable.");
+  if (confirm) {
+    const ok = await foundry.applications.api.DialogV2.confirm({
+      window: { title: "Astronav — importer les planètes" },
+      content: `<p>Importer les <strong>${pack.index.size}</strong> fiches planètes dans les journaux du monde ?</p>
+        <p style="opacity:.8;font-size:12px">Requis pour l'affichage enrichi Monk's Enhanced Journal et les favoris (joueurs inclus). Peut prendre un moment.</p>`,
+    }).catch(() => false);
+    if (!ok) return false;
+  }
+  ui.notifications.info("Astronav : import des planètes en cours…");
+  try { await pack.importAll({ folderName: "Planètes — Astronav", keepFolders: true }); }
+  catch { await pack.importAll({ folderName: "Planètes — Astronav" }); }   // repli si keepFolders non supporté
+  await game.settings.set(MODULE, "imported", true);
+  ui.notifications.info("Astronav : planètes importées dans les journaux.");
+  return true;
+}
+class ImportMenu extends foundry.applications.api.ApplicationV2 { async render() { await importToWorld({ confirm: true }); } }
+
 /* ------------------------------------------------------------------ l'app --- */
 export class AstronavApp extends foundry.applications.api.ApplicationV2 {
   static DEFAULT_OPTIONS = {
@@ -297,6 +328,8 @@ export class AstronavApp extends foundry.applications.api.ApplicationV2 {
 
   _onRender(context, options) { this._initMap(this.element); this._loadFavorites(); }
 
+  _loadCurrent() { if (this._map) { this._map.current = currentWorld(); this._schedule(); } }
+
   async _close(options) {
     this._map?.ro?.disconnect();
     return super._close(options);
@@ -343,6 +376,7 @@ export class AstronavApp extends foundry.applications.api.ApplicationV2 {
       vp, canvas, ctx: canvas.getContext("2d"),
       s: prev.s ?? 0.15, tx: prev.tx ?? 0, ty: prev.ty ?? 0, minS: prev.minS ?? 0.1, dpr: 1,
       img: prev.img, o: prev.o, dst: prev.dst, route: prev.route, favSet: prev.favSet ?? new Set(),
+      current: prev.current ?? currentWorld(),
       showLanes: prev.showLanes ?? true, showMinor: prev.showMinor ?? false, raf: 0, ro: null,
     };
     if (vp.dataset.anBound !== "1") { vp.dataset.anBound = "1"; this._bindMap(vp, canvas); }
@@ -523,6 +557,16 @@ export class AstronavApp extends foundry.applications.api.ApplicationV2 {
       ctx.fillStyle = "#d9b45b"; ctx.beginPath(); ctx.arc(sp[0], sp[1], 4.5, 0, 7); ctx.fill();
       if (showLabel) label(sp[0] + 9, sp[1] + 4, p.name, "#e6c66c", 13);
     }
+    // position courante « vous êtes ici » (alimentée par le Holocron)
+    if (m.current && byName[m.current]) {
+      const sp = SP(byName[m.current]);
+      if (sp) {
+        ctx.strokeStyle = "#eaf6ff"; ctx.lineWidth = 2.5; ctx.setLineDash([3, 4]);
+        ctx.beginPath(); ctx.arc(sp[0], sp[1], 16, 0, 7); ctx.stroke(); ctx.setLineDash([]);
+        ctx.fillStyle = "#eaf6ff"; ctx.beginPath(); ctx.arc(sp[0], sp[1], 3.5, 0, 7); ctx.fill();
+        if (showLabel) label(sp[0] + 20, sp[1] - 8, "Vous êtes ici", "#eaf6ff", 13);
+      }
+    }
     // origine / destination
     const marker = (p, col) => {
       const sp = SP(p); if (!sp) return;
@@ -537,8 +581,8 @@ export class AstronavApp extends foundry.applications.api.ApplicationV2 {
   _hitTest(cx, cy) {
     const m = this._map; if (!m) return null;
     const { byName } = getData(), K = (STAGE / CAL.size) * m.s;
-    // marqueurs réellement dessinés : origine, destination, favoris.
-    const cands = new Set([m.o?.name, m.dst?.name, ...(m.favSet || [])].filter(Boolean));
+    // marqueurs réellement dessinés : origine, destination, position courante, favoris.
+    const cands = new Set([m.o?.name, m.dst?.name, m.current, ...(m.favSet || [])].filter(Boolean));
     let best = null, bestD = 13;
     for (const name of cands) {
       const p = byName[name], im = posOf(p); if (!im) continue;
@@ -682,15 +726,35 @@ Hooks.once("init", () => {
   // Étiquettes des ressources consommées (le pool réel est suivi par fvtt-party-resources côté Holocron).
   for (const [key, def] of [["resFoodLabel", "Vivres"], ["resFuelLabel", "Carburant"], ["resRepairLabel", "Pièce de réparation"]])
     game.settings.register(MODULE, key, { name: `Ressource — ${def}`, scope: "world", config: true, type: String, default: def });
+  // import du compendium + position courante (alimentée par le Holocron)
+  for (const key of ["imported", "importPrompted"])
+    game.settings.register(MODULE, key, { scope: "world", config: false, type: Boolean, default: false });
+  game.settings.register(MODULE, "currentWorld", { scope: "world", config: false, type: String, default: "" });
+  game.settings.registerMenu(MODULE, "importMenu", {
+    name: "Fiches planètes (journaux)", label: "Importer dans les journaux…", icon: "fa-solid fa-file-import",
+    hint: "Copie les fiches du compendium dans les journaux du monde (requis pour l'affichage MEJ et les favoris).",
+    type: ImportMenu, restricted: true,
+  });
 
   const m = game.modules.get(MODULE);
   m.api = {
     ...(m.api || {}),
     open: () => new AstronavApp().render(true),
     setLeg, showWorld, chooser, favorites: favoriteWorlds,
+    setCurrentWorld, currentWorld, importToWorld,
     data: async () => { await ensureData(); return getData(); },
     lastCost: null, AstronavApp,
   };
+});
+
+// 1er lancement (MJ) : proposer d'importer le compendium dans les journaux si absent.
+Hooks.once("ready", async () => {
+  if (!game.user.isGM || game.settings.get(MODULE, "imported")) return;
+  const folder = game.folders?.find((f) => f.type === "JournalEntry" && f.name === "Planètes — Astronav");
+  if (folder) return game.settings.set(MODULE, "imported", true);
+  if (game.settings.get(MODULE, "importPrompted")) return;   // ne proposer qu'une fois automatiquement
+  await game.settings.set(MODULE, "importPrompted", true);
+  importToWorld({ confirm: true });
 });
 
 // Bouton dans les contrôles de scène (barre de gauche), groupe « jetons ».

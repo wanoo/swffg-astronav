@@ -144,7 +144,7 @@ def main():
                     ("region", "sector", "coord", "grid", "xy", "charted", "img") if p.get(k) is not None},
                 "monks-enhanced-journal": mej_entry,
             },
-            "ownership": {"default": 0}, "sort": 0, "_stats": {}
+            "ownership": {"default": 2}, "sort": 0, "_stats": {}   # OBSERVER : joueurs peuvent voir + favoriser
         }
         json.dump(doc, open(os.path.join(SRC, f"journal_{jid}.json"), "w"), ensure_ascii=False)
         n += 1

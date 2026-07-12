@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.6.0
+
+- **Import dans les journaux** : au 1er lancement (MJ), l'Astronav propose d'importer le compendium
+  des planètes dans les journaux du monde (requis pour l'affichage **Monk's Enhanced Journal** et
+  les **favoris**). Aussi accessible via *Paramètres → « Importer dans les journaux… »*.
+  Les fiches sont importées en **droits de vue OBSERVER** (joueurs comme MJ).
+- **« Vous êtes ici »** : marqueur de **position courante** sur la carte, alimenté par l'API
+  `api.setCurrentWorld(nom)` (le Holocron y met le monde du vaisseau).
+
 ## 1.5.3
 
 - **Fix** : les bascules Grandes/Mineures de la carte ne réagissaient pas au clic (la capture
