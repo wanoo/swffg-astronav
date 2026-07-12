@@ -477,7 +477,8 @@ export class AstronavApp extends foundry.applications.api.ApplicationV2 {
   _hitTest(cx, cy) {
     const m = this._map; if (!m) return null;
     const { byName } = getData(), K = (STAGE / CAL.size) * m.s;
-    const cands = new Set([LEG.from, LEG.to, ...(m.favSet || [])].filter(Boolean));
+    // marqueurs réellement dessinés : origine, destination, favoris.
+    const cands = new Set([m.o?.name, m.dst?.name, ...(m.favSet || [])].filter(Boolean));
     let best = null, bestD = 13;
     for (const name of cands) {
       const p = byName[name], im = posOf(p); if (!im) continue;
