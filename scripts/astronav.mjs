@@ -253,8 +253,9 @@ export class AstronavApp extends foundry.applications.api.ApplicationV2 {
 export const LEG = { from: null, to: null };
 
 function legApps() {
-  return Object.values(ui.windows ?? {}).filter(
-    (w) => w instanceof AstronavApp || w?.constructor?.name === "NaviComputerApp");
+  // toute fenêtre ouverte sachant recevoir un preset (AstronavApp, ou le Command Deck
+  // d'un module tiers qui implémente applyLeg).
+  return Object.values(ui.windows ?? {}).filter((w) => typeof w?.applyLeg === "function");
 }
 function dispatchLeg() {
   const apps = legApps();

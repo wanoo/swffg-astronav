@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.4.0
+
+- **Le tableau de bord Navi-Computer quitte ce module** : il devient le module séparé
+  **SWFFG Command Deck** (`swffg-command-deck`), qui dépend de celui-ci. Ce module se
+  recentre sur l'astrogation (calculateur + compendium planètes + macro « ce monde »).
+- API conservée : `open`, `setLeg`, `showWorld`, `chooser`, `data`. `openDashboard`/`install`
+  sont retirés (fournis désormais par SWFFG Command Deck).
+
 ## 1.3.0
 
 - **Fiches planètes en Monk's Enhanced Journal « Place »** : couverture image, champs
