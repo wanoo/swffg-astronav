@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.5.3
+
+- **Fix** : les bascules Grandes/Mineures de la carte ne réagissaient pas au clic (la capture
+  de pointeur du viewport avalait le clic) — corrigé.
+- **Hyperdrive** : libellés clairs (Classe 0.5 — rapide … Classe 4 — lent). Une classe **basse**
+  est plus **rapide** (moins de jours, moins de vivres).
+- **Réglage MJ « Difficulté des voyages »** : Très facile ↔ Très difficile, milieu = règles FFG.
+  Décale la difficulté d'astrogation de −2 à +2.
+- **Factions hostiles** : menu à **cases à cocher** (allégeances connues) au lieu du champ CSV.
+
 ## 1.5.2
 
 - **Renommage** du module : `swffg-astronav` → **`swffg-astronavigation`** (uniformisation avec
