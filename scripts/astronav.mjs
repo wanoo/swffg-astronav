@@ -138,6 +138,8 @@ export async function ensureData() {
 export const getData = () => ({ byName: BY_NAME, graph: GRAPH, list: LIST });
 export const hostileSet = () => new Set(String(game.settings.get(MODULE, "hostile") || "").split(",").map((s) => s.trim()).filter(Boolean));
 const S = (k) => game.settings.get(MODULE, k);
+// Fond de carte : « routes » = carte canon avec hyperroutes cuites ; sinon fond épuré (inpainting).
+const bgFile = () => (S("mapBackground") === "routes" ? "img/galaxy-map.jpg" : "img/galaxy-map-clean.jpg");
 const allAffiliations = () => {
   const s = new Set();
   for (const p of Object.values(BY_NAME || {})) for (const a of (p.f?.aff || [])) if (a) s.add(a);
@@ -385,7 +387,7 @@ export class AstronavApp extends foundry.applications.api.ApplicationV2 {
     // image de fond : chargée une fois, gardée sur l'instance
     if (!this._map.img) {
       const img = new Image();
-      img.src = foundry.utils.getRoute(asset("img/galaxy-map.jpg"));
+      img.src = foundry.utils.getRoute(asset(bgFile()));
       // succès → fond + cadrage ; échec (404/offline) → carte sans fond, route + marqueurs quand même.
       img.decode().then(() => { this._map.img = img; this._fitGalaxy(); }).catch(() => { this._fitGalaxy(); });
     }
@@ -736,6 +738,20 @@ Hooks.once("init", () => {
   game.settings.register(MODULE, "usure", {
     name: "Usure du vaisseau (%)", hint: "Au-delà de 50 %, +1 à la difficulté ; au-delà de 80 %, +2.",
     scope: "world", config: true, type: Number, default: 0, range: { min: 0, max: 100, step: 5 },
+  });
+  game.settings.register(MODULE, "mapBackground", {
+    name: "Fond de carte", hint: "« Avec routes » = carte canon (hyperroutes cuites). « Sans routes » = fond épuré ; le module trace ses propres routes et itinéraires par-dessus.",
+    scope: "world", config: true, type: String, default: "clean",
+    choices: { routes: "Avec routes (canon)", clean: "Sans routes (épuré)" },
+    onChange: () => {   // recharge le fond des fenêtres Astronav ouvertes sans perdre le zoom
+      for (const app of foundry.applications.instances.values()) {
+        if (app instanceof AstronavApp && app._map) {
+          const img = new Image();
+          img.src = foundry.utils.getRoute(asset(bgFile()));
+          img.decode().then(() => { app._map.img = img; app._draw(); }).catch(() => {});
+        }
+      }
+    },
   });
   game.settings.register(MODULE, "travelDifficulty", {
     name: "Difficulté des voyages", hint: "Décale la difficulté d'astrogation. Milieu = règles FFG.",

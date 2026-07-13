@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.7.1
+
+- **Fond de carte au choix (réglage MJ)** : « Avec routes (canon) » = carte d'origine avec les
+  hyperroutes cuites ; « Sans routes (épuré) » = fond nébuleuse nettoyé par inpainting (les routes
+  violettes effacées), le module traçant ses propres itinéraires et overlays par-dessus. Défaut =
+  **épuré** (évite le doublon avec les hyperroutes dessinées). Bascule à chaud sans perdre le zoom.
+
 ## 1.7.0
 
 - **Version de partage public** : README illustré (capture de la carte), templates d'issues
