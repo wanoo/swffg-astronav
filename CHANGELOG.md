@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.7.5 — Fix activation : dépendance MEJ
+
+- **Correctif** : impossible d'activer le module « à cause des prérequis » même avec Monk's Enhanced
+  Journal installé. Cause : le manifeste se disait compatible Foundry **v12+** mais exigeait
+  **MEJ ≥ 13** (or MEJ 13.x nécessite Foundry v13) → prérequis insatisfiable sur Foundry v12.
+- La compatibilité minimale passe à **Foundry v13** (le module en a besoin : MEJ 13.x + ApplicationV2).
+- La dépendance MEJ n'est plus contrainte en version et fournit son **manifeste** (auto-installation
+  proposée par Foundry). Aucune autre dépendance cachée (MEJ n'en a pas).
+
 ## 1.7.4
 
 - **Deux toggles indépendants (4 états)** : 🌌 **Hyperspace** (affiche/masque l'overlay du réseau des
