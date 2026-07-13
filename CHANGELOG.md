@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.7.2
+
+- **Contrat d'usure** : nouvelle API `api.usure()` / `api.setUsure(pct)` (0–100) pour piloter l'usure
+  du vaisseau qui alimente la difficulté d'astrogation (> 50 % : +1 ; > 80 % : +2). Le **Holocron**
+  y pousse l'usure réelle du vaisseau.
+- **Recalcul live** : changer l'usure (API ou réglage) **rafraîchit immédiatement** la difficulté
+  affichée dans les fenêtres Astronav ouvertes (`onChange`). Le réglage indique qu'il est
+  auto-alimenté par le vaisseau quand le Holocron est présent.
+
 ## 1.7.1
 
 - **Fond de carte au choix (réglage MJ)** : « Avec routes (canon) » = carte d'origine avec les

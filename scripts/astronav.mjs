@@ -202,6 +202,14 @@ export async function setCurrentWorld(name) {
   for (const a of legApps()) a._loadCurrent?.();
 }
 
+/* ---- usure du vaisseau (%) : alimente la difficulté d'astrogation, poussée par le Holocron ---- */
+export const usure = () => Math.max(0, Math.min(100, Number(game.settings.get(MODULE, "usure")) || 0));
+export async function setUsure(pct) {
+  const v = Math.max(0, Math.min(100, Math.round(Number(pct) || 0)));
+  if (v !== usure()) await game.settings.set(MODULE, "usure", v);   // onChange recalcule les fenêtres ouvertes
+  return v;
+}
+
 /* ---- import du compendium dans les journaux du monde (requis MEJ + favoris) ---- */
 export async function importToWorld({ confirm = true } = {}) {
   if (!game.user.isGM) return ui.notifications.warn("Réservé au MJ.");
@@ -736,8 +744,10 @@ Hooks.once("init", () => {
     hint: "Coche les allégeances dont les mondes sont évités en mode discret.", type: HostileMenu, restricted: true,
   });
   game.settings.register(MODULE, "usure", {
-    name: "Usure du vaisseau (%)", hint: "Au-delà de 50 %, +1 à la difficulté ; au-delà de 80 %, +2.",
+    name: "Usure du vaisseau (%)",
+    hint: "Au-delà de 50 %, +1 à la difficulté ; au-delà de 80 %, +2. Mise à jour automatiquement par le vaisseau (Holocron) si présent.",
     scope: "world", config: true, type: Number, default: 0, range: { min: 0, max: 100, step: 5 },
+    onChange: () => { for (const a of legApps()) a.applyLeg?.(LEG); },   // recalcul live de la difficulté
   });
   game.settings.register(MODULE, "mapBackground", {
     name: "Fond de carte", hint: "« Avec routes » = carte canon (hyperroutes cuites). « Sans routes » = fond épuré ; le module trace ses propres routes et itinéraires par-dessus.",
@@ -777,6 +787,7 @@ Hooks.once("init", () => {
     open: () => new AstronavApp().render(true),
     setLeg, showWorld, chooser, favorites: favoriteWorlds,
     setCurrentWorld, currentWorld, importToWorld,
+    usure, setUsure,
     data: async () => { await ensureData(); return getData(); },
     lastCost: null, AstronavApp,
   };
