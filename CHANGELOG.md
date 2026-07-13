@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.7.4
+
+- **Deux toggles indépendants (4 états)** : 🌌 **Hyperspace** (affiche/masque l'overlay du réseau des
+  voies hyperspatiales canon) et 🛣️ **Routes (carte)** (bascule le fond de carte avec / sans routes).
+  On peut combiner les deux librement.
+
 ## 1.7.3
 
 - **Le toggle de la carte bascule le FOND avec / sans hyperroutes** (au lieu de dessiner le réseau) :

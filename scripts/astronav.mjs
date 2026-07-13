@@ -312,7 +312,8 @@ export class AstronavApp extends foundry.applications.api.ApplicationV2 {
           <div class="an-viewport" id="an-vp">
             <canvas class="an-canvas" id="an-canvas"></canvas>
             <div class="an-lanetog">
-              <button type="button" data-bg="routes" title="Afficher le fond de carte avec les hyperroutes canon">🛣️ Routes sur la carte</button>
+              <button type="button" data-lane="all" title="Afficher/masquer le réseau des voies hyperspatiales (overlay tracé)">🌌 Hyperspace</button>
+              <button type="button" data-bg="routes" title="Basculer le fond de carte avec / sans les hyperroutes cuites">🛣️ Routes (carte)</button>
             </div>
             <div class="an-legend">
               <span><b style="color:#6fbf8f">●</b> origine</span>
@@ -387,10 +388,12 @@ export class AstronavApp extends foundry.applications.api.ApplicationV2 {
       s: prev.s ?? 0.15, tx: prev.tx ?? 0, ty: prev.ty ?? 0, minS: prev.minS ?? 0.1, dpr: 1,
       img: prev.img, o: prev.o, dst: prev.dst, route: prev.route, favSet: prev.favSet ?? new Set(),
       current: prev.current ?? currentWorld(),
-      bgRoutes: prev.bgRoutes ?? (S("mapBackground") === "routes"), raf: 0, ro: null,
+      bgRoutes: prev.bgRoutes ?? (S("mapBackground") === "routes"),
+      showLanes: prev.showLanes ?? false, raf: 0, ro: null,
     };
     if (vp.dataset.anBound !== "1") { vp.dataset.anBound = "1"; this._bindMap(vp, canvas); }
     root.querySelector('[data-bg="routes"]')?.classList.toggle("on", this._map.bgRoutes);
+    root.querySelector('[data-lane="all"]')?.classList.toggle("on", this._map.showLanes);
     // image de fond : chargée une fois, gardée sur l'instance (avec ou sans routes selon le toggle)
     if (!this._map.img) {
       const img = new Image();
@@ -432,14 +435,20 @@ export class AstronavApp extends foundry.applications.api.ApplicationV2 {
     };
     vp.addEventListener("pointerup", end); vp.addEventListener("pointercancel", () => { drag = null; vp.classList.remove("grabbing"); });
 
-    // toggle : bascule le FOND de carte (avec / sans hyperroutes) — ne dessine plus le réseau.
+    // deux toggles indépendants (4 états) : overlay des voies hyperspatiales + fond de carte.
     vp.querySelector(".an-lanetog").addEventListener("click", (e) => {
-      const b = e.target.closest("[data-bg]"); if (!b) return;
-      this._map.bgRoutes = !this._map.bgRoutes;
-      b.classList.toggle("on", this._map.bgRoutes);
-      const img = new Image();
-      img.src = foundry.utils.getRoute(asset(BG(this._map.bgRoutes)));
-      img.decode().then(() => { this._map.img = img; this._draw(); }).catch(() => this._draw());
+      const lane = e.target.closest("[data-lane]"), bg = e.target.closest("[data-bg]");
+      if (lane) {                                   // Hyperspace : dessine / masque le réseau des lanes
+        this._map.showLanes = !this._map.showLanes;
+        lane.classList.toggle("on", this._map.showLanes);
+        this._schedule();
+      } else if (bg) {                              // Route minor : échange le fond de carte (avec / sans routes)
+        this._map.bgRoutes = !this._map.bgRoutes;
+        bg.classList.toggle("on", this._map.bgRoutes);
+        const img = new Image();
+        img.src = foundry.utils.getRoute(asset(BG(this._map.bgRoutes)));
+        img.decode().then(() => { this._map.img = img; this._draw(); }).catch(() => this._draw());
+      }
     });
 
     vp.querySelector(".an-zoom").addEventListener("click", (e) => {
@@ -532,7 +541,20 @@ export class AstronavApp extends foundry.applications.api.ApplicationV2 {
       ctx.strokeStyle = "rgba(5,7,12,.9)"; ctx.lineJoin = "round";
       ctx.strokeText(txt, x, y); ctx.fillStyle = col; ctx.fillText(txt, x, y);
     };
-    // Le tracé ne sert QUE pour le chemin calculé — le réseau canon est porté par le fond de carte.
+    // Overlay « Hyperspace » (toggle) : réseau des voies hyperspatiales canon (data/lanes.json).
+    if (LANES && m.showLanes) {
+      ctx.lineCap = "round"; ctx.lineJoin = "round";
+      for (const l of LANES) {
+        const pts = l.pts; if (!pts || pts.length < 2) continue;
+        ctx.strokeStyle = l.major ? (LANE_COL[l.name] || "#e6c66c") : "#9a86c9";
+        ctx.lineWidth = l.major ? 2.6 : 1.4; ctx.globalAlpha = l.major ? .85 : .5;
+        ctx.beginPath();
+        pts.forEach((pt, i) => { const [x, y] = XYc(pt); if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y); });
+        ctx.stroke();
+        if (showLabel && l.major) { const [mx, my] = XYc(pts[Math.floor(pts.length / 2)]); label(mx + 10, my - 6, l.name, LANE_COL[l.name] || "#e6c66c", 12); }
+      }
+      ctx.globalAlpha = 1;
+    }
     // route calculée : segments colorés par classe, avec halo pour bien ressortir (secondaires violets).
     if (m.route?.segs && o && dst && o.name !== dst.name) {
       ctx.lineCap = "round"; ctx.lineJoin = "round";
