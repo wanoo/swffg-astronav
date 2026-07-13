@@ -18,10 +18,10 @@ pack = ROOT / "packs" / "planetes"
 if not pack.exists() or not any(pack.iterdir()):
     sys.exit("packs/planetes absent — lance d'abord : python3 build_pack.py && node build_pack.mjs")
 
-EXCLUDE_TOP = {"_source", "node_modules", "dist", ".git"}
+EXCLUDE_TOP = {"_source", "node_modules", "dist", ".git", "docs", ".github"}
 EXCLUDE_NAME = {"build.py", "build_pack.py", "build_pack.mjs", "build_macros.mjs",
                 "fetch_images.py", "planets.raw.json", "_failed.json", ".DS_Store",
-                "package.json", "package-lock.json"}
+                "package.json", "package-lock.json", "RECETTE.md"}
 
 def included(rel: pathlib.Path) -> bool:
     if rel.name in EXCLUDE_NAME: return False

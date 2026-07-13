@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.7.0
+
+- **Version de partage public** : README illustré (capture de la carte), templates d'issues
+  (bug / idée), nettoyage du paquet (captures et docs hors module distribué).
+- Regroupe tout le contenu 1.5.x–1.6.x : carte galactique, atlas MEJ 6849 mondes, favoris,
+  « vous êtes ici », jet réussi = arrivée, réglages MJ, import dans les journaux.
+
 ## 1.6.1
 
 - **Jet réussi → arrivée** : un jet d'Astrogation **réussi** (succès nets > 0) déplace
