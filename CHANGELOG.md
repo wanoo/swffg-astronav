@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.7.3
+
+- **Le toggle de la carte bascule le FOND avec / sans hyperroutes** (au lieu de dessiner le réseau) :
+  un seul bouton « 🛣️ Routes sur la carte » qui échange l'image de fond (carte canon ↔ fond épuré),
+  aligné sur le réglage « Fond de carte par défaut ».
+- **Le tracé ne sert plus qu'au chemin calculé** : l'overlay du réseau canon est retiré ; seul
+  l'itinéraire A\* est dessiné par-dessus.
+- **Segments secondaires plus visibles et violets** : trait plus épais, **violet vif** (#bf3bff) et
+  **halo** — le tracé secondaire ressort nettement sur le fond nébuleuse.
+
 ## 1.7.2
 
 - **Contrat d'usure** : nouvelle API `api.usure()` / `api.setUsure(pct)` (0–100) pour piloter l'usure

@@ -26,7 +26,7 @@ const CT = { 1: "2 rounds", 2: "5 rounds", 3: "10 minutes", 4: "1 heure", 5: "4 
 const STAGE = 5400;
 const CAL = { cx: 2699.5, cy: 2490, k: 2.155, size: 5400 };
 const posOf = (p) => (p && p.xy) ? [CAL.cx + p.xy[0] * CAL.k, CAL.cy - p.xy[1] * CAL.k] : null;
-const SEG_STYLE = { major: ["#ffd76a", 3.4, []], minor: ["#c9a6ff", 3, []], off: ["#57c7ff", 2.6, [8, 6]] };
+const SEG_STYLE = { major: ["#ffd76a", 3.6, []], minor: ["#bf3bff", 4.4, []], off: ["#57c7ff", 2.8, [8, 6]] };
 const LANE_COL = { "Corellian Run": "#e6c66c", "Voie Perlemienne": "#8fd0ff", "Épine corellienne": "#f0a35c", "Voie Hydienne": "#a0dc8a", "Route de Rimma": "#d99bff" };
 
 function buildGraph(byName, lanes) {
@@ -139,7 +139,8 @@ export const getData = () => ({ byName: BY_NAME, graph: GRAPH, list: LIST });
 export const hostileSet = () => new Set(String(game.settings.get(MODULE, "hostile") || "").split(",").map((s) => s.trim()).filter(Boolean));
 const S = (k) => game.settings.get(MODULE, k);
 // Fond de carte : « routes » = carte canon avec hyperroutes cuites ; sinon fond épuré (inpainting).
-const bgFile = () => (S("mapBackground") === "routes" ? "img/galaxy-map.jpg" : "img/galaxy-map-clean.jpg");
+const BG = (routes) => (routes ? "img/galaxy-map.jpg" : "img/galaxy-map-clean.jpg");
+const bgFile = () => BG(S("mapBackground") === "routes");
 const allAffiliations = () => {
   const s = new Set();
   for (const p of Object.values(BY_NAME || {})) for (const a of (p.f?.aff || [])) if (a) s.add(a);
@@ -311,15 +312,14 @@ export class AstronavApp extends foundry.applications.api.ApplicationV2 {
           <div class="an-viewport" id="an-vp">
             <canvas class="an-canvas" id="an-canvas"></canvas>
             <div class="an-lanetog">
-              <button type="button" data-lane="major">Grandes routes</button>
-              <button type="button" data-lane="minor">Routes mineures</button>
+              <button type="button" data-bg="routes" title="Afficher le fond de carte avec les hyperroutes canon">🛣️ Routes sur la carte</button>
             </div>
             <div class="an-legend">
               <span><b style="color:#6fbf8f">●</b> origine</span>
               <span><b style="color:#57c7ff">●</b> destination</span>
               <span><b style="color:#d9b45b">●</b> favori</span>
               <span><b style="color:#ffd76a">▬</b> grande route</span>
-              <span><b style="color:#c9a6ff">▬</b> secondaire</span>
+              <span><b style="color:#bf3bff">▬</b> secondaire</span>
               <span><b style="color:#57c7ff">┄</b> hors réseau</span>
             </div>
             <div class="an-zoom">
@@ -387,15 +387,14 @@ export class AstronavApp extends foundry.applications.api.ApplicationV2 {
       s: prev.s ?? 0.15, tx: prev.tx ?? 0, ty: prev.ty ?? 0, minS: prev.minS ?? 0.1, dpr: 1,
       img: prev.img, o: prev.o, dst: prev.dst, route: prev.route, favSet: prev.favSet ?? new Set(),
       current: prev.current ?? currentWorld(),
-      showLanes: prev.showLanes ?? true, showMinor: prev.showMinor ?? false, raf: 0, ro: null,
+      bgRoutes: prev.bgRoutes ?? (S("mapBackground") === "routes"), raf: 0, ro: null,
     };
     if (vp.dataset.anBound !== "1") { vp.dataset.anBound = "1"; this._bindMap(vp, canvas); }
-    root.querySelector('[data-lane="major"]')?.classList.toggle("on", this._map.showLanes);
-    root.querySelector('[data-lane="minor"]')?.classList.toggle("on", this._map.showMinor);
-    // image de fond : chargée une fois, gardée sur l'instance
+    root.querySelector('[data-bg="routes"]')?.classList.toggle("on", this._map.bgRoutes);
+    // image de fond : chargée une fois, gardée sur l'instance (avec ou sans routes selon le toggle)
     if (!this._map.img) {
       const img = new Image();
-      img.src = foundry.utils.getRoute(asset(bgFile()));
+      img.src = foundry.utils.getRoute(asset(BG(this._map.bgRoutes)));
       // succès → fond + cadrage ; échec (404/offline) → carte sans fond, route + marqueurs quand même.
       img.decode().then(() => { this._map.img = img; this._fitGalaxy(); }).catch(() => { this._fitGalaxy(); });
     }
@@ -433,12 +432,14 @@ export class AstronavApp extends foundry.applications.api.ApplicationV2 {
     };
     vp.addEventListener("pointerup", end); vp.addEventListener("pointercancel", () => { drag = null; vp.classList.remove("grabbing"); });
 
+    // toggle : bascule le FOND de carte (avec / sans hyperroutes) — ne dessine plus le réseau.
     vp.querySelector(".an-lanetog").addEventListener("click", (e) => {
-      const l = e.target.dataset.lane; if (!l) return;
-      const key = l === "major" ? "showLanes" : "showMinor";
-      this._map[key] = !this._map[key];
-      e.target.classList.toggle("on", this._map[key]);
-      this._schedule();
+      const b = e.target.closest("[data-bg]"); if (!b) return;
+      this._map.bgRoutes = !this._map.bgRoutes;
+      b.classList.toggle("on", this._map.bgRoutes);
+      const img = new Image();
+      img.src = foundry.utils.getRoute(asset(BG(this._map.bgRoutes)));
+      img.decode().then(() => { this._map.img = img; this._draw(); }).catch(() => this._draw());
     });
 
     vp.querySelector(".an-zoom").addEventListener("click", (e) => {
@@ -531,31 +532,18 @@ export class AstronavApp extends foundry.applications.api.ApplicationV2 {
       ctx.strokeStyle = "rgba(5,7,12,.9)"; ctx.lineJoin = "round";
       ctx.strokeText(txt, x, y); ctx.fillStyle = col; ctx.fillText(txt, x, y);
     };
-    // overlay hyperroutes : polylignes des tracés (data/lanes.json, champ pts)
-    if (LANES && (m.showLanes || m.showMinor)) {
-      ctx.lineCap = "round"; ctx.lineJoin = "round";
-      for (const l of LANES) {
-        if (l.major ? !m.showLanes : !m.showMinor) continue;
-        const pts = l.pts; if (!pts || pts.length < 2) continue;
-        ctx.strokeStyle = l.major ? (LANE_COL[l.name] || "#e6c66c") : "#9a86c9";
-        ctx.lineWidth = l.major ? 2.6 : 1.3; ctx.globalAlpha = l.major ? .9 : .55;
-        ctx.beginPath();
-        pts.forEach((pt, i) => { const [x, y] = XYc(pt); if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y); });
-        ctx.stroke();
-        if (showLabel && l.major) { const [mx, my] = XYc(pts[Math.floor(pts.length / 2)]); label(mx + 10, my - 6, l.name, LANE_COL[l.name] || "#e6c66c", 12); }
-      }
-      ctx.globalAlpha = 1;
-    }
-    // route calculée : segments colorés par classe
+    // Le tracé ne sert QUE pour le chemin calculé — le réseau canon est porté par le fond de carte.
+    // route calculée : segments colorés par classe, avec halo pour bien ressortir (secondaires violets).
     if (m.route?.segs && o && dst && o.name !== dst.name) {
-      ctx.lineCap = "round";
+      ctx.lineCap = "round"; ctx.lineJoin = "round";
       for (const seg of m.route.segs) {
         const [col, w2, dash] = SEG_STYLE[seg.cls];
         const [x1, y1] = XYc(seg.a), [x2, y2] = XYc(seg.b);
-        ctx.setLineDash(dash); ctx.strokeStyle = col; ctx.lineWidth = w2; ctx.globalAlpha = .95;
+        ctx.setLineDash(dash); ctx.strokeStyle = col; ctx.lineWidth = w2; ctx.globalAlpha = .97;
+        ctx.shadowColor = col; ctx.shadowBlur = seg.cls === "minor" ? 11 : 6;   // les secondaires ressortent nettement
         ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
       }
-      ctx.setLineDash([]); ctx.globalAlpha = 1;
+      ctx.shadowBlur = 0; ctx.setLineDash([]); ctx.globalAlpha = 1;
     } else if (o && dst && o.name !== dst.name) {
       const po = SP(o), pdt = SP(dst);
       if (po && pdt) { ctx.setLineDash([8, 6]); ctx.strokeStyle = "#57c7ff"; ctx.lineWidth = 2.6; ctx.beginPath(); ctx.moveTo(po[0], po[1]); ctx.lineTo(pdt[0], pdt[1]); ctx.stroke(); ctx.setLineDash([]); }
@@ -750,14 +738,17 @@ Hooks.once("init", () => {
     onChange: () => { for (const a of legApps()) a.applyLeg?.(LEG); },   // recalcul live de la difficulté
   });
   game.settings.register(MODULE, "mapBackground", {
-    name: "Fond de carte", hint: "« Avec routes » = carte canon (hyperroutes cuites). « Sans routes » = fond épuré ; le module trace ses propres routes et itinéraires par-dessus.",
+    name: "Fond de carte par défaut", hint: "« Avec routes » = carte canon (hyperroutes cuites). « Sans routes » = fond épuré. Le bouton « Routes sur la carte » de la fenêtre bascule à la volée ; seul le tracé du trajet est dessiné par-dessus.",
     scope: "world", config: true, type: String, default: "clean",
     choices: { routes: "Avec routes (canon)", clean: "Sans routes (épuré)" },
-    onChange: () => {   // recharge le fond des fenêtres Astronav ouvertes sans perdre le zoom
+    onChange: (v) => {   // aligne le fond des fenêtres ouvertes sur le nouveau défaut (sans perdre le zoom)
+      const routes = v === "routes";
       for (const app of foundry.applications.instances.values()) {
         if (app instanceof AstronavApp && app._map) {
+          app._map.bgRoutes = routes;
+          app.element?.querySelector?.('[data-bg="routes"]')?.classList.toggle("on", routes);
           const img = new Image();
-          img.src = foundry.utils.getRoute(asset(bgFile()));
+          img.src = foundry.utils.getRoute(asset(BG(routes)));
           img.decode().then(() => { app._map.img = img; app._draw(); }).catch(() => {});
         }
       }
