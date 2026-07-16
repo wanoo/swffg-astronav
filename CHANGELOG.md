@@ -1,5 +1,20 @@
 # Changelog
 
+## 2.0.0 — MASTER SWITCH : l'atlas passe en Campaign Codex
+
+**Rupture** : la dépendance Monk's Enhanced Journal est remplacée par
+**Campaign Codex**. Les 6 849 fiches planètes du compendium sont désormais des
+fiches CC **location** (données region/secteur/coordonnées reprises des flags
+astronav, description conservée, image conservée, **ids inchangés** — favoris,
+liens et imports existants restent valides), rattachées à **10 fiches region**
+(une par région galactique). Tags `data.tags` = favoris (cf. 1.8.0).
+
+- ⚠️ Après mise à jour : **ré-importer l'atlas** (menu ou bouton d'import) pour
+  remplacer les fiches MEJ du monde par les versions CC — les ids identiques
+  font que l'import met à jour sans casser les références.
+- Le hook `renderEnhancedJournal` (MEJ) est retiré ; les boutons Astronav/★
+  passent par les hooks standard et les sheets Campaign Codex (ApplicationV2).
+
 ## 1.8.0 — Favoris de table : tag « Favori » (Campaign Codex / Asset Librarian)
 
 - **Nouveaux favoris partagés** (master switch de l'écosystème Holocron) : un monde

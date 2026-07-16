@@ -252,7 +252,7 @@ export async function setUsure(pct) {
   return v;
 }
 
-/* ---- import du compendium dans les journaux du monde (requis MEJ + favoris) ---- */
+/* ---- import du compendium dans les journaux du monde (fiches CC + favoris) ---- */
 export async function importToWorld({ confirm = true } = {}) {
   if (!game.user.isGM) return ui.notifications.warn("Réservé au MJ.");
   const pack = game.packs.get(`${MODULE}.planetes`);
@@ -261,7 +261,7 @@ export async function importToWorld({ confirm = true } = {}) {
     const ok = await foundry.applications.api.DialogV2.confirm({
       window: { title: "Astronav — importer les planètes" },
       content: `<p>Importer les <strong>${pack.index.size}</strong> fiches planètes dans les journaux du monde ?</p>
-        <p style="opacity:.8;font-size:12px">Requis pour l'affichage enrichi Monk's Enhanced Journal et les favoris (joueurs inclus). Peut prendre un moment.</p>`,
+        <p style="opacity:.8;font-size:12px">Requis pour l'affichage des fiches Campaign Codex (régions, tags favoris), joueurs inclus. Peut prendre un moment.</p>`,
     }).catch(() => false);
     if (!ok) return false;
   }
@@ -906,5 +906,5 @@ function injectAstroBtn(app, html) {
     }
   } catch { /* structure d'en-tête variable selon les versions */ }
 }
-for (const hook of ["renderJournalEntrySheet", "renderJournalSheet", "renderEnhancedJournal"])
+for (const hook of ["renderJournalEntrySheet", "renderJournalSheet"])
   Hooks.on(hook, (app, html) => injectAstroBtn(app, html));
