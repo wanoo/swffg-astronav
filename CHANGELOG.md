@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.0.1 — Tags de caractéristiques : Terrain & Climat
+
+- Les fiches planètes portent leurs **caractéristiques clés en tags Campaign
+  Codex** (`data.tags`, navigables/filtrables via Asset Librarian) : terrain et
+  climat quand connus (~450 fiches), tags atomiques capitalisés (« Aquatique »,
+  « Tempéré »…). Les tags posés à la main (dont « Favori ») sont préservés.
+
 ## 2.0.0 — MASTER SWITCH : l'atlas passe en Campaign Codex
 
 **Rupture** : la dépendance Monk's Enhanced Journal est remplacée par
