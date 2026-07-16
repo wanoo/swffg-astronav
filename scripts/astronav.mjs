@@ -179,19 +179,60 @@ export const dice = (pool) => ["di", "ch", "bo", "se"].map((k) => {
 }).join("");
 export { DN };
 
-/** Mondes mis en favori via l'étoile de Monk's Enhanced Journal (marque-pages par utilisateur). */
+/** Favoris de la TABLE (master switch Campaign Codex) : tag « Favori » posé sur la
+ * fiche planète (flags.campaign-codex.data.tags, sinon asset-librarian.filterTag) +
+ * index compact flags.holocron.config.favorites maintenu par l'Holocron et l'étoile
+ * ci-dessous. Repli legacy : marque-pages Monk's Enhanced Journal. */
+const FAV_TAG = "favori";
+const favTagsOf = (j) => {
+  const raw = j?.flags?.["campaign-codex"]?.data?.tags ?? j?.flags?.["asset-librarian"]?.filterTag;
+  return (Array.isArray(raw) ? raw : String(raw || "").split(",")).map((s) => String(s).trim().toLowerCase());
+};
+const holocronConfigJournal = () => game.journal.find((j) => j.flags?.holocron?.config) || null;
+
 export async function favoriteWorlds() {
+  await ensureData();
+  const names = new Set();
+  // 1. index compact de la config Holocron (écrit par l'app web et l'étoile)
+  const cfg = holocronConfigJournal()?.flags?.holocron?.config;
+  for (const f of (cfg?.favorites || [])) if (f?.name && BY_NAME?.[f.name]) names.add(f.name);
+  // 2. fiches taguées « Favori » (tag posé à la main via Asset Librarian / Campaign Codex)
+  for (const j of game.journal) if (favTagsOf(j).includes(FAV_TAG) && BY_NAME?.[j.name]) names.add(j.name);
+  if (names.size) return [...names];
+  // 3. legacy : marque-pages MEJ (pré-migration)
   const bm = game.user?.getFlag?.("monks-enhanced-journal", "bookmarks") || [];
-  const names = [];
   for (const b of bm) {
     let doc = null; try { doc = await fromUuid(b.entityId); } catch { /* uuid mort */ }
     if (!doc) continue;
     if (doc.pack === `${MODULE}.planetes` || doc.flags?.[MODULE]?.xy || doc.parent?.flags?.[MODULE]) {
       const nm = doc.parent?.name ?? doc.name;
-      if (BY_NAME?.[nm]) names.push(nm);
+      if (BY_NAME?.[nm]) names.add(nm);
     }
   }
-  return [...new Set(names)];
+  return [...names];
+}
+
+/** Bascule le favori d'un monde (MJ) : tag sur la fiche + index config Holocron. */
+export async function toggleFavoriteWorld(name) {
+  if (!game.user.isGM) return ui.notifications.warn("Favoris de table : réservé au MJ.");
+  const j = game.journal.getName(name);
+  if (!j) return ui.notifications.warn(`Fiche introuvable pour « ${name} » — importe l'atlas.`);
+  const isCC = Boolean(j.flags?.["campaign-codex"]?.type);
+  const raw = isCC ? j.flags?.["campaign-codex"]?.data?.tags : j.flags?.["asset-librarian"]?.filterTag;
+  const tags = (Array.isArray(raw) ? raw : String(raw || "").split(",")).map((s) => String(s).trim()).filter(Boolean);
+  const has = tags.some((t) => t.toLowerCase() === FAV_TAG);
+  const next = has ? tags.filter((t) => t.toLowerCase() !== FAV_TAG) : [...tags, "Favori"];
+  await j.update({ [isCC ? "flags.campaign-codex.data.tags" : "flags.asset-librarian.filterTag"]: next });
+  // index compact (le web lit celui-ci sans scanner l'atlas)
+  const cfgJ = holocronConfigJournal();
+  if (cfgJ) {
+    const cur = (cfgJ.flags.holocron.config.favorites || []).filter((f) => f?.id !== j.id);
+    const favs = has ? cur : [...cur, { id: j.id, name }];
+    await cfgJ.update({ "flags.holocron.config.favorites": favs });
+  }
+  ui.notifications.info(`${has ? "★ Retiré des" : "★ Ajouté aux"} favoris : ${name}`);
+  for (const a of legApps()) a._loadFavorites?.();
+  return !has;
 }
 
 /* ---- position courante « vous êtes ici » (alimentée par le Holocron) ---- */
@@ -798,7 +839,7 @@ Hooks.once("init", () => {
   m.api = {
     ...(m.api || {}),
     open: () => new AstronavApp().render(true),
-    setLeg, showWorld, chooser, favorites: favoriteWorlds,
+    setLeg, showWorld, chooser, favorites: favoriteWorlds, toggleFavorite: toggleFavoriteWorld,
     setCurrentWorld, currentWorld, importToWorld,
     usure, setUsure,
     data: async () => { await ensureData(); return getData(); },
@@ -828,16 +869,20 @@ Hooks.on("getSceneControlButtons", (controls) => {
 /* ---- bouton « Astronav » sur les fiches planète (MEJ Place / compendium) ---- */
 function planetOf(doc) {
   if (!doc) return null;
-  const isPlanet = doc.flags?.["monks-enhanced-journal"]?.pagetype === "place"
+  const cc = doc.flags?.["campaign-codex"]?.type;
+  const isPlanet = cc === "location" || cc === "region"
+    || doc.flags?.["monks-enhanced-journal"]?.pagetype === "place"
     || doc.pack === `${MODULE}.planetes` || doc.flags?.[MODULE]?.xy
     || doc.parent?.flags?.[MODULE];
   return isPlanet ? (doc.parent?.name ?? doc.name) : null;
 }
-// v13 ApplicationV2 : contrôles d'en-tête.
+// v13 ApplicationV2 : contrôles d'en-tête (itinéraire + étoile de favori MJ).
 Hooks.on("getHeaderControlsApplicationV2", (app, controls) => {
   const name = planetOf(app?.document); if (!name || !Array.isArray(controls)) return;
   controls.push({ icon: "fa-solid fa-route", label: "SWFFG.astronav.setLeg", action: "swffgAstronav",
     onClick: () => game.modules.get(MODULE).api.chooser(name) });
+  if (game.user.isGM) controls.push({ icon: "fa-solid fa-star", label: "SWFFG.astronav.favorite", action: "swffgAstronavFav",
+    onClick: () => toggleFavoriteWorld(name) });
 });
 // Fallback DOM (fiche journal standard + fenêtre Monk's Enhanced Journal).
 function injectAstroBtn(app, html) {
@@ -852,6 +897,13 @@ function injectAstroBtn(app, html) {
     a.addEventListener("click", () => game.modules.get(MODULE).api.chooser(name));
     (header.querySelector(".window-title") ?? header).after?.(a);
     header.appendChild(a);
+    if (game.user.isGM && !header.querySelector("[data-astronav-fav]")) {
+      const s = document.createElement("a");
+      s.className = "header-control"; s.dataset.astronavFav = "1"; s.title = "★ Favori de table";
+      s.innerHTML = '<i class="fa-solid fa-star"></i>'; s.style.cssText = "margin:0 4px;cursor:pointer";
+      s.addEventListener("click", () => toggleFavoriteWorld(name));
+      header.appendChild(s);
+    }
   } catch { /* structure d'en-tête variable selon les versions */ }
 }
 for (const hook of ["renderJournalEntrySheet", "renderJournalSheet", "renderEnhancedJournal"])

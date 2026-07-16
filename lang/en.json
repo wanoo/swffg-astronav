@@ -1,5 +1,6 @@
 {
   "SWFFG.astronav.title": "Astronav — Astrogation",
   "SWFFG.astronav.open": "Open Astronav",
-  "SWFFG.astronav.setLeg": "Astronav: origin / destination"
+  "SWFFG.astronav.setLeg": "Astronav: origin / destination",
+  "SWFFG.astronav.favorite": "★ Table favourite"
 }

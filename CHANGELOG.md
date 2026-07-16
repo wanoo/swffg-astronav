@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.8.0 — Favoris de table : tag « Favori » (Campaign Codex / Asset Librarian)
+
+- **Nouveaux favoris partagés** (master switch de l'écosystème Holocron) : un monde
+  est favori s'il porte le tag **« Favori »** sur sa fiche (`campaign-codex.data.tags`
+  pour une fiche CC, sinon `asset-librarian.filterTag`) ; un **index compact**
+  `flags.holocron.config.favorites` est maintenu pour l'app web. `api.favorites()`
+  lit index + tags, avec repli sur les marque-pages MEJ (legacy, pré-migration).
+- **★ Étoile de favori (MJ)** dans l'en-tête des fiches planètes (à côté du bouton
+  Astronav) : bascule le tag + l'index. Nouvelle API `api.toggleFavorite(name)`.
+- Les fiches **Campaign Codex location/region** sont reconnues comme planètes
+  (bouton Astronav, favoris) — prépare l'atlas CC de la 2.0.
+
 ## 1.7.5 — Fix activation : dépendance MEJ
 
 - **Correctif** : impossible d'activer le module « à cause des prérequis » même avec Monk's Enhanced
