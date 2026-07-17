@@ -274,6 +274,58 @@ export async function importToWorld({ confirm = true } = {}) {
 }
 class ImportMenu extends foundry.applications.api.ApplicationV2 { async render() { await importToWorld({ confirm: true }); } }
 
+/* ---- migration de l'atlas du monde : fiches MEJ (import pré-2.0) → fiches CC ---- */
+/** Remplace l'ancien atlas MEJ importé dans les journaux du monde par les fiches
+ * Campaign Codex du compendium (ids du pack conservés → liens parentRegion stables),
+ * en préservant les favoris (tag « Favori » re-posé + index config Holocron
+ * reconstruit). Idempotente : sans fiche MEJ atlas restante, ne fait rien. */
+export async function migrateWorldAtlas({ confirm = true } = {}) {
+  if (!game.user.isGM) return ui.notifications.warn("Réservé au MJ.");
+  const pack = game.packs.get(`${MODULE}.planetes`);
+  if (!pack) return ui.notifications.error("Compendium des planètes introuvable.");
+  // anciennes fiches atlas : flag astronav SANS flag Campaign Codex
+  const old = game.journal.filter((j) => j.flags?.[MODULE] && !j.flags?.["campaign-codex"]?.type);
+  if (!old.length) return false;
+  if (confirm) {
+    const ok = await foundry.applications.api.DialogV2.confirm({
+      window: { title: "Astronav — migrer l'atlas en Campaign Codex" },
+      content: `<p>Remplacer les <strong>${old.length}</strong> anciennes fiches planètes (MEJ) du monde
+        par les fiches <strong>Campaign Codex</strong> du compendium ?</p>
+        <p style="opacity:.8;font-size:12px">Les favoris sont conservés. Requis avant de désactiver
+        Monk's Enhanced Journal. Peut prendre plusieurs minutes.</p>`,
+    }).catch(() => false);
+    if (!ok) return false;
+  }
+  const favs = await favoriteWorlds();                       // noms, toutes sources confondues
+  ui.notifications.info(`Astronav : migration de l'atlas (${old.length} fiches)…`);
+  const ids = old.map((j) => j.id);
+  for (let i = 0; i < ids.length; i += 500) await JournalEntry.deleteDocuments(ids.slice(i, i + 500));
+  try { await pack.importAll({ folderName: "Planètes — Astronav", keepFolders: true, keepId: true }); }
+  catch { await pack.importAll({ folderName: "Planètes — Astronav", keepId: true }); }
+  await game.settings.set(MODULE, "imported", true);
+  // favoris : tag re-posé sur les nouvelles fiches + index compact reconstruit
+  const index = [];
+  for (const name of favs) {
+    const j = game.journal.getName(name);
+    if (!j?.flags?.["campaign-codex"]?.type) continue;
+    const tags = (j.flags["campaign-codex"].data?.tags || []).filter(Boolean);
+    if (!tags.some((t) => String(t).toLowerCase() === FAV_TAG))
+      await j.update({ "flags.campaign-codex.data.tags": [...tags, "Favori"] });
+    index.push({ id: j.id, name });
+  }
+  const cfgJ = holocronConfigJournal();
+  if (cfgJ) await cfgJ.update({ "flags.holocron.config.favorites": index });
+  ui.notifications.info(`Astronav : atlas migré en fiches Campaign Codex (${index.length} favori(s) conservé(s)).`);
+  return true;
+}
+class MigrateMenu extends foundry.applications.api.ApplicationV2 {
+  async render() {
+    const done = await migrateWorldAtlas({ confirm: true });
+    if (done === false) ui.notifications.info("Astronav : aucun ancien atlas MEJ à migrer (ou annulé).");
+    return this;
+  }
+}
+
 /* ------------------------------------------------------------------ l'app --- */
 export class AstronavApp extends foundry.applications.api.ApplicationV2 {
   static DEFAULT_OPTIONS = {
@@ -826,13 +878,18 @@ Hooks.once("init", () => {
   for (const [key, def] of [["resFoodLabel", "Vivres"], ["resFuelLabel", "Carburant"], ["resRepairLabel", "Pièce de réparation"]])
     game.settings.register(MODULE, key, { name: `Ressource — ${def}`, scope: "world", config: true, type: String, default: def });
   // import du compendium + position courante (alimentée par le Holocron)
-  for (const key of ["imported", "importPrompted"])
+  for (const key of ["imported", "importPrompted", "migratePrompted"])
     game.settings.register(MODULE, key, { scope: "world", config: false, type: Boolean, default: false });
   game.settings.register(MODULE, "currentWorld", { scope: "world", config: false, type: String, default: "" });
   game.settings.registerMenu(MODULE, "importMenu", {
     name: "Fiches planètes (journaux)", label: "Importer dans les journaux…", icon: "fa-solid fa-file-import",
-    hint: "Copie les fiches du compendium dans les journaux du monde (requis pour l'affichage MEJ et les favoris).",
+    hint: "Copie les fiches du compendium dans les journaux du monde (requis pour les favoris de table).",
     type: ImportMenu, restricted: true,
+  });
+  game.settings.registerMenu(MODULE, "migrateMenu", {
+    name: "Migration atlas → Campaign Codex", label: "Migrer l'atlas…", icon: "fa-solid fa-arrows-rotate",
+    hint: "Remplace les anciennes fiches planètes MEJ du monde par les fiches Campaign Codex du compendium (favoris conservés). Requis avant de désactiver Monk's Enhanced Journal.",
+    type: MigrateMenu, restricted: true,
   });
 
   const m = game.modules.get(MODULE);
@@ -840,7 +897,7 @@ Hooks.once("init", () => {
     ...(m.api || {}),
     open: () => new AstronavApp().render(true),
     setLeg, showWorld, chooser, favorites: favoriteWorlds, toggleFavorite: toggleFavoriteWorld,
-    setCurrentWorld, currentWorld, importToWorld,
+    setCurrentWorld, currentWorld, importToWorld, migrateWorldAtlas,
     usure, setUsure,
     data: async () => { await ensureData(); return getData(); },
     lastCost: null, AstronavApp,
@@ -849,7 +906,15 @@ Hooks.once("init", () => {
 
 // 1er lancement (MJ) : proposer d'importer le compendium dans les journaux si absent.
 Hooks.once("ready", async () => {
-  if (!game.user.isGM || game.settings.get(MODULE, "imported")) return;
+  if (!game.user.isGM) return;
+  // atlas MEJ pré-2.0 détecté → proposer la migration en fiches CC (une fois auto ;
+  // relançable via le menu de réglage ou api.migrateWorldAtlas()).
+  const hasOldAtlas = game.journal.some((j) => j.flags?.[MODULE] && !j.flags?.["campaign-codex"]?.type);
+  if (hasOldAtlas && !game.settings.get(MODULE, "migratePrompted")) {
+    await game.settings.set(MODULE, "migratePrompted", true);
+    return void migrateWorldAtlas({ confirm: true });
+  }
+  if (game.settings.get(MODULE, "imported")) return;
   const folder = game.folders?.find((f) => f.type === "JournalEntry" && f.name === "Planètes — Astronav");
   if (folder) return game.settings.set(MODULE, "imported", true);
   if (game.settings.get(MODULE, "importPrompted")) return;   // ne proposer qu'une fois automatiquement
