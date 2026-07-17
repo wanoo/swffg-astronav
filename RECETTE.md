@@ -1,7 +1,7 @@
 # Cahier de recette — SWFFG Astronav
 
-Version cible : **1.3.0** · Système : **starwarsffg** · Foundry VTT **v13** (v12 mini)
-· **requiert** Monk's Enhanced Journal.
+Version cible : **2.0.x** · Système : **starwarsffg** · Foundry VTT **v13** (v12 mini)
+· **requiert** Campaign Codex (`campaign-codex`).
 
 Déroule chaque cas dans l'ordre, note le résultat (✅ / ❌) et la remarque éventuelle.
 Les cas marqués **MJ** nécessitent un compte MJ ; **PJ** un compte joueur.
@@ -37,18 +37,18 @@ Table de matières : [0. Installation](#0-installation) · [1. Compendium](#1-co
 
 ---
 
-## 1bis. Fiches MEJ « Place »
+## 1bis. Fiches Campaign Codex « location »
 
 | # | Objectif | Étapes | Résultat attendu | ✅/❌ |
 |---|----------|--------|------------------|------|
-| 1b.1 | MEJ requis | Installer swffg-astronavigation sans MEJ | Foundry signale la dépendance et propose d'installer **Monk's Enhanced Journal**. | |
-| 1b.2 | Rendu Place | MEJ actif, ouvrir **Tatooine** | S'ouvre en sheet **« Place »** : couverture image en en-tête, **Type de lieu** = région, **Localisation** = secteur ; corps = description + lieux notables + tableau réduit. | |
-| 1b.3 | Ilum conforme | Ouvrir **Ilum** | placetype = Régions Inconnues, location = Secteur 7G, districts (attribut) = K-6 ; couverture = image locale ; tableau = Terrain/Population/Affiliations/Espèces/Cartographie. | |
-| 1b.4 | Images en dur | Inspecter la couverture (clic droit image → copier l'adresse) | Chemin **`modules/swffg-astronavigation/img/planets/…`** — aucun lien `wikia`. Image visible hors-ligne. | |
-| 1b.5 | Favori MEJ | Ajouter Tatooine aux favoris/marque-pages MEJ | Le monde apparaît dans la barre de favoris ; persiste après réouverture (fonction native MEJ). | |
-| 1b.6 | Sans image | Ouvrir un monde sans visuel (ex. un système mineur) | Sheet Place sans couverture, champs et tableau corrects, pas d'erreur. | |
-| 1b.7 | Macro depuis Place | Fiche Place ouverte, lancer **🧭 Astronav — ce monde** | Menu titré au nom du monde ; **Départ/Arrivée** remplissent le calculateur (détection page/entrée MEJ OK). | |
-| 1b.8 | Pack verrouillé | Compendium verrouillé, ouvrir une Place | Rendu MEJ en lecture seule, sans erreur console. | |
+| 1b.1 | CC requis | Installer swffg-astronavigation sans Campaign Codex | Foundry signale la dépendance et propose d'installer **Campaign Codex**. | |
+| 1b.2 | Rendu location | CC actif, ouvrir **Tatooine** | S'ouvre en sheet **Campaign Codex « location »** : image, description, région/secteur/coordonnées, tags **Terrain**/**Climat**. | |
+| 1b.3 | Régions | Arborescence / fiche | 10 fiches **« region »** (une par région galactique) ; la planète référence sa région (`parentRegion`). | |
+| 1b.4 | Images en dur | Inspecter l'image (clic droit → copier l'adresse) | Chemin **`modules/swffg-astronavigation/img/planets/…`** — aucun lien `wikia`. Image visible hors-ligne. | |
+| 1b.5 | Favori (tag) | MJ : cliquer l'★ dans l'en-tête de la fiche **Tatooine** | Tag **« Favori »** posé sur la fiche ; le monde apparaît dans les favoris de l'Astronav ; persiste après réouverture. | |
+| 1b.6 | Sans image | Ouvrir un monde sans visuel (ex. un système mineur) | Sheet location sans image, champs et tags corrects, pas d'erreur. | |
+| 1b.7 | Macro depuis fiche | Fiche location ouverte, lancer **🧭 Astronav — ce monde** | Menu titré au nom du monde ; **Départ/Arrivée** remplissent le calculateur. | |
+| 1b.8 | Pack verrouillé | Compendium verrouillé, ouvrir une fiche | Rendu CC en lecture seule, sans erreur console. | |
 
 ## 2. Calculateur d'astrogation
 

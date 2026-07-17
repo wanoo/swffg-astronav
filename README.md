@@ -15,9 +15,11 @@ une **carte galactique interactive**, un **calculateur d'astrogation** aux règl
   **discret** (évite les factions hostiles), jet posté dans le chat.
 - 📍 **« Vous êtes ici »** — la position du vaisseau sur la carte ; un **jet d'astrogation réussi
   déplace le groupe** vers la destination.
-- 🪐 **Atlas de 6 849 planètes** — compendium en fiches **Monk's Enhanced Journal « Place »**
-  (image, secteur, coordonnées, terrain, climat, population, affiliations, description).
-- ⭐ **Favoris** — épingle tes mondes (marque-pages MEJ), ils apparaissent sur la carte.
+- 🪐 **Atlas de 6 849 planètes** — compendium en fiches **Campaign Codex « location »**
+  (image, région, secteur, coordonnées, tags Terrain/Climat, description) + 10 fiches
+  **« region »** (une par région galactique).
+- ⭐ **Favoris** — épingle tes mondes (tag **« Favori »** sur la fiche, ★ dans l'en-tête
+  de la sheet pour le MJ), ils apparaissent sur la carte.
 - 🎚️ **Réglable par le MJ** — difficulté des voyages (Très facile ↔ Très difficile, milieu = FFG),
   factions hostiles (cases à cocher), étiquettes de ressources.
 
@@ -29,11 +31,11 @@ Dans Foundry : **Modules → Installer un module**, puis colle l'URL du manifest
 https://github.com/wanoo/swffg-astronavigation/releases/latest/download/module.json
 ```
 
-**Dépendance requise** : [Monk's Enhanced Journal](https://foundryvtt.com/packages/monks-enhanced-journal)
-(les fiches planètes sont des sheets « Place »). Foundry propose de l'installer automatiquement.
+**Dépendance requise** : [Campaign Codex](https://campaigncodex.wgtngm.com/) (`campaign-codex`)
+(les fiches planètes sont des fiches « location »). Foundry propose de l'installer automatiquement.
 
 Au **1er lancement (MJ)**, le module propose d'**importer l'atlas dans les journaux** (requis pour
-l'affichage MEJ et les favoris ; les fiches sont visibles par les joueurs).
+les favoris ; les fiches sont visibles par les joueurs).
 
 ## 🚀 Utilisation
 
