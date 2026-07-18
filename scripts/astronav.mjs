@@ -253,6 +253,44 @@ export async function setUsure(pct) {
 }
 
 /* ---- import du compendium dans les journaux du monde (fiches CC + favoris) ---- */
+/** Dossier d'accueil : « Campaign Codex - Locations » (l'arborescence CC) >
+ * « 🪐 Planètes — Astronav » > dossiers par région (structure du pack). */
+async function ensureAtlasHost() {
+  const find = (name, parentId = null) => game.folders.find((f) =>
+    f.type === "JournalEntry" && f.name === name && (f.folder?.id ?? null) === parentId) || null;
+  const parent = find("Campaign Codex - Locations")
+    || await Folder.create({ name: "Campaign Codex - Locations", type: "JournalEntry" });
+  return find("🪐 Planètes — Astronav", parent.id)
+    || await Folder.create({ name: "🪐 Planètes — Astronav", type: "JournalEntry", folder: parent.id });
+}
+
+/** Importe le pack sous le dossier d'accueil (ids conservés, dossiers du pack gardés). */
+async function importPlanetsPack(pack) {
+  const host = await ensureAtlasHost();
+  try { await pack.importAll({ folderId: host.id, keepFolders: true, keepId: true }); }
+  catch { await pack.importAll({ folderId: host.id, keepId: true }); }   // repli si keepFolders non supporté
+  await game.settings.set(MODULE, "imported", true);
+  const locs = game.journal.filter((j) => j.flags?.["campaign-codex"]?.type === "location" && j.flags?.[MODULE]).length;
+  const regs = game.journal.filter((j) => j.flags?.["campaign-codex"]?.type === "region").length;
+  ui.notifications.info(`Astronav : atlas importé — ${locs} planètes, ${regs} régions (dossier 🌌 Régions galactiques).`);
+}
+
+/** Favoris : tag « Favori » re-posé d'après l'index Holocron + index reconstruit. */
+async function restoreFavorites(favNames) {
+  const index = [];
+  for (const name of favNames) {
+    const j = game.journal.getName(name);
+    if (!j?.flags?.["campaign-codex"]?.type) continue;
+    const tags = (j.flags["campaign-codex"].data?.tags || []).filter(Boolean);
+    if (!tags.some((t) => String(t).toLowerCase() === FAV_TAG))
+      await j.update({ "flags.campaign-codex.data.tags": [...tags, "Favori"] });
+    index.push({ id: j.id, name });
+  }
+  const cfgJ = holocronConfigJournal();
+  if (cfgJ) await cfgJ.update({ "flags.holocron.config.favorites": index });
+  return index.length;
+}
+
 export async function importToWorld({ confirm = true } = {}) {
   if (!game.user.isGM) return ui.notifications.warn("Réservé au MJ.");
   const pack = game.packs.get(`${MODULE}.planetes`);
@@ -261,15 +299,16 @@ export async function importToWorld({ confirm = true } = {}) {
     const ok = await foundry.applications.api.DialogV2.confirm({
       window: { title: "Astronav — importer les planètes" },
       content: `<p>Importer les <strong>${pack.index.size}</strong> fiches planètes dans les journaux du monde ?</p>
-        <p style="opacity:.8;font-size:12px">Requis pour l'affichage des fiches Campaign Codex (régions, tags favoris), joueurs inclus. Peut prendre un moment.</p>`,
+        <p style="opacity:.8;font-size:12px">Rangées sous Campaign Codex - Locations > 🪐 Planètes — Astronav.
+        Requis pour les favoris de table, joueurs inclus. Peut prendre un moment.</p>`,
     }).catch(() => false);
     if (!ok) return false;
   }
+  const favs = await favoriteWorlds();       // index Holocron : survit à une suppression des fiches
   ui.notifications.info("Astronav : import des planètes en cours…");
-  try { await pack.importAll({ folderName: "Planètes — Astronav", keepFolders: true }); }
-  catch { await pack.importAll({ folderName: "Planètes — Astronav" }); }   // repli si keepFolders non supporté
-  await game.settings.set(MODULE, "imported", true);
-  ui.notifications.info("Astronav : planètes importées dans les journaux.");
+  await importPlanetsPack(pack);
+  const n = await restoreFavorites(favs);
+  if (n) ui.notifications.info(`Astronav : ${n} favori(s) restauré(s).`);
   return true;
 }
 class ImportMenu extends foundry.applications.api.ApplicationV2 { async render() { await importToWorld({ confirm: true }); } }
@@ -300,22 +339,9 @@ export async function migrateWorldAtlas({ confirm = true } = {}) {
   ui.notifications.info(`Astronav : migration de l'atlas (${old.length} fiches)…`);
   const ids = old.map((j) => j.id);
   for (let i = 0; i < ids.length; i += 500) await JournalEntry.deleteDocuments(ids.slice(i, i + 500));
-  try { await pack.importAll({ folderName: "Planètes — Astronav", keepFolders: true, keepId: true }); }
-  catch { await pack.importAll({ folderName: "Planètes — Astronav", keepId: true }); }
-  await game.settings.set(MODULE, "imported", true);
-  // favoris : tag re-posé sur les nouvelles fiches + index compact reconstruit
-  const index = [];
-  for (const name of favs) {
-    const j = game.journal.getName(name);
-    if (!j?.flags?.["campaign-codex"]?.type) continue;
-    const tags = (j.flags["campaign-codex"].data?.tags || []).filter(Boolean);
-    if (!tags.some((t) => String(t).toLowerCase() === FAV_TAG))
-      await j.update({ "flags.campaign-codex.data.tags": [...tags, "Favori"] });
-    index.push({ id: j.id, name });
-  }
-  const cfgJ = holocronConfigJournal();
-  if (cfgJ) await cfgJ.update({ "flags.holocron.config.favorites": index });
-  ui.notifications.info(`Astronav : atlas migré en fiches Campaign Codex (${index.length} favori(s) conservé(s)).`);
+  await importPlanetsPack(pack);
+  const n = await restoreFavorites(favs);
+  ui.notifications.info(`Astronav : atlas migré en fiches Campaign Codex (${n} favori(s) conservé(s)).`);
   return true;
 }
 class MigrateMenu extends foundry.applications.api.ApplicationV2 {
